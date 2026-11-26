@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchOcean } from '../public/atlas/oceano.mjs';
 import { fetchTemperature, isTemperatureSnapshot } from '../lib/temperatura.mjs';
 import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
+import { refreshPanorama } from '../lib/panorama.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
 const dayMs = 86400000;
@@ -187,7 +188,46 @@ async function seedCurrentSlot(stateDir, panorama) {
   const filename = record.mode === 'fuentes' ? 'fuentes.json' : 'text.json';
   await writeFile(join(dir, filename), JSON.stringify(record), { mode: 0o600 });
 }
-async function mirrorPublic(root, cache, now, restore) {
+// Choose observations by their successful read, and independently retain the
+// newest actual attempt (which may have failed after that read on another host).
+export function mergePanorama(seed, published, now = Date.now()) {
+  if (!seed || ![1,2].includes(seed.schemaVersion) || ![1,2].includes(published?.schemaVersion) ||
+      !Array.isArray(seed.sources) || !Array.isArray(seed.items) ||
+      !Array.isArray(published.sources) || !Array.isArray(published.items)) return published;
+  const sources = new Map(published.sources.map(s => [s.id,s]));
+  const replacements = new Map();
+  let checkedThrough = Date.parse(published.updatedAt);
+  if (!Number.isFinite(checkedThrough)) return published;
+  let schemaVersion = published.schemaVersion;
+  for (const s of seed.sources) {
+    const success = Date.parse(s.lastSuccessAt), checked = Date.parse(s.checkedAt);
+    if (!['ok','stale'].includes(s.status) || !Number.isFinite(success) || !Number.isFinite(checked) ||
+        success > checked || checked > now || (s.status === 'ok' && success !== checked)) continue;
+    const records = seed.items.filter(i => i.sourceId === s.id);
+    if (records.length !== s.count || records.some(i => !i.id) ||
+        new Set(records.map(i => i.id)).size !== records.length) continue;
+    const existing = sources.get(s.id);
+    const oldSuccess = Date.parse(existing?.lastSuccessAt), oldCheck = Date.parse(existing?.checkedAt);
+    const useSeed = !Number.isFinite(oldSuccess) || success > oldSuccess;
+    if (!useSeed && !(checked > oldCheck)) continue;
+    const data = useSeed ? s : existing;
+    const attempt = !Number.isFinite(oldCheck) || checked > oldCheck ? s : existing;
+    // A failed reading is stale as soon as either host has a successful copy.
+    const merged = {...data, checkedAt:attempt.checkedAt, status:attempt.status === 'ok' ? 'ok' : 'stale'};
+    delete merged.errorCode;
+    if (merged.status === 'stale' && attempt.errorCode) merged.errorCode = attempt.errorCode;
+    sources.set(s.id,merged);
+    checkedThrough = Math.max(checkedThrough,Date.parse(merged.checkedAt));
+    if (useSeed) {
+      replacements.set(s.id,records);
+      schemaVersion = Math.min(schemaVersion,seed.schemaVersion);
+    }
+  }
+  return {...published,schemaVersion,updatedAt:new Date(checkedThrough).toISOString(),sources:[...sources.values()],
+    items:[...published.items.filter(i=>!replacements.has(i.sourceId)),...[...replacements.values()].flat()]};
+}
+
+async function mirrorPublic(root, cache, now, restore, seed = null) {
   // A first runner may have reserved an edition and stopped before validating
   // the first snapshot. In that case use the public assets checked into main.
   if (restore && !(await optionalFile(join(cache, baseFiles[0])))) return;
@@ -196,6 +236,10 @@ async function mirrorPublic(root, cache, now, restore) {
   for (const relative of baseFiles) {
     const data = await optionalFile(join(source, relative));
     if (!data) continue;
+    if (restore && seed && relative === baseFiles[0]) {
+      await writeFile(join(target,relative),JSON.stringify(mergePanorama(seed,JSON.parse(data),now)));
+      continue;
+    }
     if (relative === temperatureFile && !savedTemperature(data)) continue;
     await copy(join(source, relative), join(target, relative));
   }
@@ -262,7 +306,14 @@ export async function publishCycle({
       meta = JSON.parse(await readFile(join(cache, metaName), 'utf8'));
       if (meta.format !== signature || !['pending', 'initialized'].includes(meta.state))
         throw new Error('La rama no pertenece al publicador del atlas.');
-      await mirrorPublic(root, cache, now, true);
+      let seed = null;
+      try {
+        await verify(root);
+        seed = JSON.parse(await readFile(join(root,baseFiles[0]),'utf8'));
+      } catch {
+        console.warn('La semilla de main no superó la verificación. Se recupera la edición publicada.');
+      }
+      await mirrorPublic(root, cache, now, true, seed);
     }
 
     const key = parseKey(keyValue);
@@ -292,11 +343,12 @@ export async function publishCycle({
       meta.state = 'initialized';
     };
 
-    if (!refresh) {
-      const { actualizar } = await import('./actualizar.mjs');
-      refresh = () => actualizar({ ai: false, bulletin: false });
-    }
-    const snapshot = await refresh();
+    const previous = JSON.parse(await readFile(join(root,baseFiles[0]),'utf8'));
+    // Bypass the waiting interval for failed sources only. collect() writes the
+    // real attempted time and status to the result, even if the retry fails.
+    const retryInput = {...previous,sources:previous.sources?.map(s =>
+      ['stale','error'].includes(s.status) ? {...s,checkedAt:null} : s)};
+    const snapshot = await (refresh ?? refreshPanorama)(retryInput,{now:new Date(now)});
     const temperaturePath = join(root, temperatureFile);
     try {
       const stored = await optionalFile(temperaturePath);

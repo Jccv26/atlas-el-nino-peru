@@ -46,10 +46,6 @@ export async function actualizar({force = false, ai = true, bulletin: buildBulle
     } catch { console.error('No se pudo generar esta edición. Se conservan los avisos oficiales.'); }
   }
   await save(destination, snapshot);
-  for (const source of snapshot.sources) {
-    if (source.errorCode && source.checkedAt === snapshot.updatedAt)
-      console.warn('Consulta oficial pendiente', source.id, source.errorCode);
-  }
   console.log(JSON.stringify({updatedAt:snapshot.updatedAt, sources:snapshot.sources.map(s=>[s.id,s.status,s.count??0]), bulletin: snapshot.bulletin?.id || null}));
   return snapshot;
 }

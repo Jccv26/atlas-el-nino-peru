@@ -871,7 +871,7 @@ function renderSources() {
       );
       if (s.lastSuccessAt)
         d.append(node("small", "Última lectura: " + dateTime(s.lastSuccessAt)));
-      if (s.status === "error" && s.checkedAt)
+      if ((s.status === "error" || s.status === "stale") && s.checkedAt)
         d.append(node("small", "Intento: " + dateTime(s.checkedAt)));
       return d;
     }),
