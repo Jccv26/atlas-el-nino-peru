@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.estado/
+.vercel/
+.DS_Store
+node_modules/
+*.log

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es-PE">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0c1c24" />
+    <meta
+      name="description"
+      content="Explora El Niño en el Perú con mapas, avisos oficiales, fuentes regionales y un comparador histórico."
+    />
+    <title>Atlas de El Niño · Perú al Día</title>
+    <link rel="icon" href="./atlas/marca.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="./atlas/instrument-sans.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./atlas.css" />
+  </head>
+  <body>
+    <a class="skip" href="#avisos">Saltar a los avisos</a>
+    <header class="mast">
+      <a class="brand" href="#inicio" aria-label="Perú al Día, inicio"
+        ><img src="./atlas/marca.svg" width="37" height="37" alt="" /><span
+          >Perú al Día<small>Atlas de El Niño</small></span
+        ></a
+      >
+      <nav aria-label="Navegación principal">
+        <a class="active" href="#inicio">Mapa</a
+        ><a href="./historia.html">Historia</a><a href="#avisos">Avisos</a
+        ><a class="nav-source" href="#fuentes">Fuentes</a>
+      </nav>
+      <form id="searchForm" class="search" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" /></svg
+        ><input
+          type="search"
+          id="searchInput"
+          placeholder="Buscar región, río o lugar"
+          aria-label="Buscar región, río o lugar"
+          list="places"
+        /><datalist id="places"></datalist
+        ><button type="submit" aria-label="Buscar">↵</button>
+      </form>
+    </header>
+    <main>
+      <section id="inicio" aria-label="Mapa interactivo del Perú">
+        <div class="map-frame" id="mapFrame">
+          <svg
+            id="map"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="1 4 45 22"
+            preserveAspectRatio="xMidYMid slice"
+            role="group"
+            aria-label="Mapa regional del Perú. Puedes elegir una región en el mapa o en el selector de avisos."
+          >
+            <defs>
+              <pattern
+                id="grid"
+                width="5"
+                height="5"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M 5 0 L 0 0 0 5"
+                  fill="none"
+                  stroke="#d2e2d9"
+                  stroke-width=".018"
+                  opacity=".25"
+                />
+              </pattern>
+              <mask
+                id="seaMask"
+                maskUnits="userSpaceOnUse"
+                x="-70"
+                y="-70"
+                width="200"
+                height="200"
+              >
+                <rect x="-70" y="-70" width="200" height="200" fill="white" />
+                <g id="landMask" fill="black"></g>
+              </mask>
+            </defs>
+            <g id="mapWorld">
+              <image
+                href="./atlas/relieve.webp"
+                x="0"
+                y="0"
+                width="49"
+                height="31"
+                preserveAspectRatio="none"
+              />
+              <image
+                id="thermal"
+                mask="url(#seaMask)"
+                opacity=".75"
+                preserveAspectRatio="none"
+              />
+              <rect
+                width="49"
+                height="31"
+                fill="url(#grid)"
+                pointer-events="none"
+              />
+              <g id="countryLines"></g>
+              <g id="regions"></g>
+              <g id="mapLabels"></g>
+            </g>
+          </svg>
+          <div class="map-head">
+            <span class="pill map-scope"
+              ><span class="scope-icon">◎</span> Perú · Pacífico oriental</span
+            >
+            <div class="layer-switch" role="group" aria-label="Capas del mapa">
+              <button class="selected" data-layer="mar" aria-pressed="true">
+                Mar</button
+              ><button data-layer="lluvias" aria-pressed="false">Lluvias</button
+              ><button data-layer="rios" aria-pressed="false">Ríos</button>
+            </div>
+          </div>
+          <div class="climate-card" id="climateCard">
+            <div class="card-top">
+              <span class="eyebrow">Estado del fenómeno</span
+              ><span class="card-icon" aria-hidden="true">≈</span>
+            </div>
+            <h1>El Niño costero</h1>
+            <p class="mag-label" id="magLabel">
+              Magnitud del calentamiento del mar
+            </p>
+            <strong id="magnitude" class="magnitude">Extraordinaria</strong>
+            <p id="outlook">
+              Se mantendría hasta febrero de 2027, según el comunicado del 13 de
+              noviembre.
+            </p>
+            <a
+              id="climateLink"
+              target="_blank"
+              rel="noopener"
+              href="https://enfen.imarpe.gob.pe/download/comunicado-oficial-enfen-n-20-2026/"
+              ><span id="climateSource">ENFEN · 13 nov 2026</span
+              ><span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <div class="map-legend" id="mapLegend" aria-live="polite">
+            <div id="legendTitle">Anomalía térmica del mar · °C</div>
+            <div class="scale-bar" id="scaleBar"></div>
+            <div class="scales" id="scales">
+              <span>−4</span><span>0</span><span>+4</span><span>+8</span>
+            </div>
+            <button class="legend-source" id="mapDetails">
+              Acerca de esta capa <span>ⓘ</span>
+            </button>
+          </div>
+          <div class="map-tools">
+            <button id="zoomIn" aria-label="Acercar el mapa">+</button
+            ><button id="zoomOut" aria-label="Alejar el mapa">−</button
+            ><button id="resetView" aria-label="Volver a la vista nacional">
+              ⌖
+            </button>
+          </div>
+          <div id="regionCard" class="region-card" hidden>
+            <button
+              id="closeRegion"
+              class="close"
+              aria-label="Cerrar ficha regional"
+            >
+              ×</button
+            ><span class="eyebrow">Territorio seleccionado</span>
+            <h2 id="regionTitle"></h2>
+            <p id="regionCount"></p>
+            <a href="#avisos" class="text-btn"
+              >Consultar publicaciones <span>↓</span></a
+            >
+          </div>
+        </div>
+        <div class="history-dock">
+          <div class="history-name">
+            <span class="section-icon">◷</span><b>Comparar episodios</b>
+          </div>
+          <div
+            class="years"
+            role="group"
+            aria-label="Elegir episodio histórico"
+          >
+            <button data-year="1983">1982–83</button
+            ><button data-year="1998">1997–98</button
+            ><button data-year="2017">2017</button
+            ><button data-year="2026" class="chosen">2026</button>
+          </div>
+          <a href="./historia.html" class="compare-link"
+            >Abrir comparador <span>→</span></a
+          >
+        </div>
+      </section>
+      <section id="avisos" class="publications">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Consulta nacional</p>
+            <h2>Avisos y reportes</h2>
+            <p id="snapshotTime" class="subtle" aria-live="polite">
+              Consultando las fuentes…
+            </p>
+          </div>
+          <button id="listen" class="outline-btn" disabled>
+            <span aria-hidden="true">▷</span> Escuchar resumen
+          </button>
+        </div>
+        <div class="controls">
+          <div
+            class="feed-tabs"
+            role="group"
+            aria-label="Tipo de publicaciones"
+          >
+            <button class="selected" data-feed="oficial" aria-pressed="true">
+              Oficiales</button
+            ><button data-feed="prensa" aria-pressed="false">
+              Desde las regiones</button
+            ><button data-feed="todos" aria-pressed="false">Todo</button>
+          </div>
+          <div class="filters">
+            <select id="regionSelect" aria-label="Filtrar por región">
+              <option value="">Todo el Perú</option></select
+            ><select id="topic" aria-label="Filtrar por tema">
+              <option value="">Todos los temas</option>
+              <option value="lluvias">Lluvias y quebradas</option>
+              <option value="rios">Ríos</option>
+              <option value="mar">Mar y El Niño</option>
+              <option value="agua">Agua potable</option>
+            </select>
+          </div>
+        </div>
+        <div id="queryState" hidden>
+          <span></span><button type="button">Quitar búsqueda ×</button>
+        </div>
+        <div id="listCount" class="list-count" aria-live="polite"></div>
+        <div id="items" class="items"></div>
+        <button id="more" class="outline-btn" hidden>
+          Ver más publicaciones
+        </button>
+      </section>
+      <section class="sources" id="fuentes">
+        <details id="sourceDetails">
+          <summary>
+            <span
+              ><span class="eyebrow">Transparencia</span
+              ><strong>Fuentes y estado de conexión</strong></span
+            ><span class="detail-plus">+</span>
+          </summary>
+          <p class="subtle">
+            Cada entidad publica a su propio ritmo. Una consulta reciente puede
+            devolver un documento anterior; revisa la vigencia en el original.
+          </p>
+          <div id="sourceList" class="source-list"></div>
+          <h3>Cartografía</h3>
+          <p id="mapCredits">
+            Relieve de
+            <a
+              href="https://registry.opendata.aws/terrain-tiles/"
+              target="_blank"
+              rel="noopener"
+              >Mapzen Terrain Tiles</a
+            >
+            ·
+            <a
+              href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
+              target="_blank"
+              rel="noopener"
+              >Créditos del relieve</a
+            >
+            · Límites de
+            <a
+              href="https://www.geoboundaries.org/api/current/gbOpen/PER/ADM1/"
+              target="_blank"
+              rel="noopener"
+              >geoBoundaries</a
+            >
+            y
+            <a
+              href="https://www.naturalearthdata.com/"
+              target="_blank"
+              rel="noopener"
+              >Natural Earth</a
+            >
+            · Temperatura por
+            <a
+              href="https://www.ncei.noaa.gov/products/optimum-interpolation-sst"
+              target="_blank"
+              rel="noopener"
+              >NOAA OISST v2.1</a
+            >.
+          </p>
+        </details>
+      </section>
+    </main>
+    <footer>
+      <span>Perú al Día <i> / </i> Atlas de El Niño</span
+      ><span>Iniciativa ciudadana · Piloto</span>
+    </footer>
+    <dialog id="infoDialog">
+      <div class="dialog-header">
+        <span class="eyebrow" id="dialogKind"></span
+        ><button class="close" id="closeDialog" aria-label="Cerrar">×</button>
+      </div>
+      <h2 id="dialogTitle"></h2>
+      <div id="dialogBody"></div>
+    </dialog>
+    <script src="./atlas-app.mjs" type="module"></script>
+  </body>
+</html>

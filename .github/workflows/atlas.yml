@@ -1,0 +1,68 @@
+name: Actualizar y publicar el atlas
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '3-59/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+concurrency:
+  group: atlas-publicacion-produccion
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    if: github.ref == 'refs/heads/main' && endsWith(github.repository, '/atlas-el-nino-peru') && !github.event.repository.fork && !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - name: Confirmar repositorio público de origen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          policy=$(gh api "repos/$GITHUB_REPOSITORY" --jq '(.fork == false and .private == false and .default_branch == "main")')
+          test "$policy" = true
+      - name: Leer la rama principal
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Preparar Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Recuperar, contrastar y guardar la edición
+        run: node scripts/estado-ci.mjs
+        env:
+          ATLAS_GIT_TOKEN: ${{ github.token }}
+          ATLAS_STATE_KEY: ${{ secrets.ATLAS_STATE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BULLETIN_BUDGET_USD: '60'
+          ATLAS_CREDIT_UNTIL: ${{ vars.ATLAS_CREDIT_UNTIL }}
+      - name: Verificar los datos públicos y las referencias del boletín
+        run: node scripts/verificar-publico.mjs
+      - name: Empaquetar exclusivamente los archivos públicos
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: public
+          retention-days: 1
+
+  publicar:
+    needs: actualizar
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: Publicar el atlas
+        id: pages
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
