@@ -1,4 +1,5 @@
 import { createMap } from "./atlas-map.mjs?v=2";
+import { layerRecords } from "./avisos-mapa.mjs";
 const $ = (id) => document.getElementById(id);
 const node = (tag, text = "", css = "") => {
   const el = document.createElement(tag);
@@ -51,6 +52,7 @@ function findRegion(name) {
   );
 }
 let panel = null,
+  mappedItems = [],
   layer = "mar",
   feed = "oficial",
   region = "",
@@ -127,7 +129,9 @@ $("infoDialog").addEventListener("click", (e) => {
     $("infoDialog").close();
 });
 function topics(item) {
-  const t = fold((item.category || "") + " " + (item.title || ""));
+  const t = fold(
+    [item.category, item.title, item.phenomenon].filter(Boolean).join(" "),
+  );
   return {
     lluvias:
       /lluvia|quebrada|huaico|huayco|precipitaci|granizada|inundaci|tormenta/.test(
@@ -187,6 +191,7 @@ function validity(item, now = Date.now()) {
   return "publicado";
 }
 function mapPeriod(item) {
+  if (item.invalidValidity) return "";
   const state = validity(item);
   if (state === "vigente") return "active";
   if (state === "proximo") return "upcoming";
@@ -197,18 +202,24 @@ function mapPeriod(item) {
 }
 function onLayer(item) {
   if (item.kind !== "oficial" || !mapPeriod(item)) return false;
-  if (layer === "mar") return item.sourceId === "marina";
-  if (item.sourceId === "coen")
+  if (layer === "mar")
+    return (
+      item.sourceId === "marina" ||
+      (item.sourceId === "coen" &&
+        item.category === "Oleajes" &&
+        /^reporte\b/i.test(item.title))
+    );
+  if (item.sourceId === "coen" && !item.originNotice)
     return layer === "rios"
       ? item.category === "Ríos"
       : ["Lluvias", "Quebradas"].includes(item.category) ||
           (item.category === "Ríos" &&
             /lluvias|precipitaci/.test(fold(item.title)));
-  if (!item.sourceId.startsWith("senamhi-")) return false;
-  if (layer === "rios") return item.sourceId === "senamhi-rios";
+  const issuer = item.originNotice?.sourceId || item.sourceId;
+  if (layer === "rios") return issuer === "senamhi-rios";
   return (
-    ["senamhi-lluvias", "senamhi-quebradas"].includes(item.sourceId) ||
-    (item.sourceId === "senamhi-meteo" && topics(item).lluvias)
+    ["senamhi-lluvias", "senamhi-quebradas"].includes(issuer) ||
+    (issuer === "senamhi-meteo" && topics(item).lluvias)
   );
 }
 function levelFor(item, area = "") {
@@ -253,8 +264,27 @@ function showRecord(item) {
       "Reposición prevista: " + dateTime(item.expectedRestorationAt),
   ].filter(Boolean);
   if (dates.length) fields.push(node("p", dates.join(" · ")));
+  if (item.invalidValidity)
+    fields.push(
+      node(
+        "p",
+        "El boletín contiene fechas de vigencia contradictorias. Consulta el documento original.",
+      ),
+    );
   if (places(item).length)
     fields.push(node("p", "Ámbito mencionado: " + places(item).join(", ")));
+  const provinces = region && item.provincesByRegion?.[region];
+  if (provinces?.length)
+    fields.push(
+      node(
+        "p",
+        "Provincias que identifica el COEN en " +
+          regionLabel(region) +
+          ": " +
+          provinces.join(", ") +
+          ".",
+      ),
+    );
   if (item.supersededBy)
     fields.push(
       link(
@@ -300,12 +330,37 @@ function showRecord(item) {
     if (safeUrl(url))
       fields.push(
         link(
-          (["senamhi-lluvias", "senamhi-quebradas"].includes(item.sourceId)
-            ? "Visor actual de SENAMHI"
-            : "Mapa oficial de cobertura") +
+          (item.regionOrigin === "provincia-ficha-coen" && url === item.url
+            ? "Ubicación confirmada por el COEN"
+            : new URL(url).hostname === "portal.indeci.gob.pe"
+              ? "Boletín oficial del COEN (PDF)"
+              : ["senamhi-lluvias", "senamhi-quebradas"].includes(item.sourceId)
+                ? "Visor actual de SENAMHI"
+                : "Mapa oficial de cobertura") +
             (item.coverageUrls.length > 1 ? " · " + (i + 1) : "") +
             " ↗",
           url,
+        ),
+      );
+  }
+  if (item.sourceId === "coen" && item.originNotice) {
+    fields.push(
+      node(
+        "p",
+        "Este boletín del COEN reproduce el aviso n.º " +
+          item.originNotice.number +
+          " de SENAMHI (" +
+          item.originNotice.year +
+          ").",
+      ),
+    );
+  }
+  for (const reference of item.relatedNotices || []) {
+    if (reference.url !== item.url && safeUrl(reference.url))
+      fields.push(
+        link(
+          "Mismo aviso en " + (reference.source || reference.sourceId) + " ↗",
+          reference.url,
         ),
       );
   }
@@ -345,12 +400,12 @@ function showRecord(item) {
 }
 function renderItems() {
   const all = panel?.items || [];
-  const list = all.filter(
+  const list = (fromLayer ? mappedItems : all).filter(
     (it) =>
       (feed === "todos" ||
         (feed === "oficial" ? it.kind === "oficial" : it.kind !== "oficial")) &&
       (!region || inRegion(it, region)) &&
-      (!topic || topics(it)[topic]) &&
+      (!topic || fromLayer || topics(it)[topic]) &&
       (!period || validity(it) === period) &&
       (!fromLayer || onLayer(it)) &&
       (!query ||
@@ -433,14 +488,16 @@ function renderRegionCard(all) {
   const official = all.filter(
     (it) => it.kind === "oficial" && inRegion(it, region),
   );
-  const relevant = official.filter(onLayer);
+  const relevant = mappedItems.filter(
+    (it) => inRegion(it, region) && onLayer(it),
+  );
   const previews = (
     layer === "mar" && !relevant.length ? official : relevant
   ).slice(0, 2);
   $("regionTitle").textContent = regionLabel(region);
   const coverage =
     relevant.length +
-    (relevant.length === 1 ? " aviso" : " avisos") +
+    (relevant.length === 1 ? " publicación" : " publicaciones") +
     " de " +
     (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase());
   $("regionCount").textContent = panel
@@ -498,7 +555,7 @@ function syncLayer() {
   const counts = new Map(),
     regionTotals = new Map(),
     regionStatus = new Map();
-  for (const it of panel?.items || []) {
+  for (const it of mappedItems) {
     const state = onLayer(it) && mapPeriod(it);
     for (const name of regionNamesFor(it)) {
       regionTotals.set(name, (regionTotals.get(name) || 0) + 1);
@@ -539,7 +596,7 @@ function syncLayer() {
     : "Consultando cobertura…";
   const layerSources =
     layer === "mar"
-      ? ["marina"]
+      ? ["marina", "coen"]
       : layer === "rios"
         ? ["coen", "senamhi-rios"]
         : ["coen", "senamhi-lluvias", "senamhi-quebradas", "senamhi-meteo"];
@@ -581,9 +638,9 @@ function syncLayer() {
     }
     const why =
       layer === "mar"
-        ? "Cada zona tiene litoral dentro de un tramo descrito en un aviso de Hidrografía. Toca una para ver el tramo y el pronóstico de oleaje."
-        : "Estas regiones figuran en avisos o reportes oficiales. La zona concreta y los niveles aparecen en cada publicación. Toca una región para consultarlos.";
-    const unlocated = (panel.items || []).filter(
+        ? "Hidrografía identifica los tramos con pronóstico de oleaje. El COEN también reporta episodios locales. Toca una zona para consultar el tramo o la localidad y la fecha de cada publicación."
+        : "Un pronóstico identifica zonas expuestas. Un reporte de incidente describe lo ocurrido en un lugar concreto. Toca una región para ver qué documento la incluye y cuál es su vigencia.";
+    const unlocated = mappedItems.filter(
       (item) => onLayer(item) && !regionNamesFor(item).length,
     );
     const extra = node("details", "", "unlocated");
@@ -614,7 +671,17 @@ function syncLayer() {
               "p",
               "Última consulta pendiente para " +
                 delayed.map((s) => s.name).join(", ") +
-                ". Se conserva la cobertura publicada anteriormente.",
+                ". Se conserva la última lectura disponible." +
+                (mappedItems.some(
+                  (it) =>
+                    onLayer(it) &&
+                    (it.originNotice ||
+                      it.relatedNotices?.some(
+                        (ref) => ref.sourceId === "coen",
+                      )),
+                )
+                  ? " Esta capa también incluye avisos que el COEN reproduce en sus boletines oficiales."
+                  : ""),
             ),
           ]
         : []),
@@ -635,7 +702,7 @@ function syncLayer() {
       : "Criterios y fuentes de la capa  ⓘ";
 }
 $("mapDetails").onclick = () => {
-  const national = (panel?.items || []).filter(
+  const national = mappedItems.filter(
     (i) => onLayer(i) && !regionNamesFor(i).length,
   );
   const shared = [
@@ -682,7 +749,7 @@ $("mapDetails").onclick = () => {
         : "Reportes de lluvias y quebradas",
       node(
         "p",
-        "El color cubre el límite administrativo de la región. El nivel puede variar entre provincias y distritos.",
+        "El color cubre el límite administrativo de la región. El nivel puede variar entre provincias y distritos. Una republicación del COEN cuenta una sola vez cuando identifica el mismo aviso original de SENAMHI.",
       ),
       node(
         "p",
@@ -727,13 +794,19 @@ function changed() {
   renderItems();
   saveLocation();
 }
+function selectedMapTopic() {
+  if (layer !== "mar") return layer;
+  return region && mappedItems.some((it) => inRegion(it, region) && onLayer(it))
+    ? layer
+    : "";
+}
 function setRegion(name, viaMap = false) {
   region = knownRegions.includes(name) ? name : "";
   if (viaMap) {
     feed = "oficial";
     query = "";
     period = "";
-    topic = layer === "mar" ? "" : layer;
+    topic = selectedMapTopic();
     fromLayer = Boolean(topic);
   }
   changed();
@@ -754,7 +827,7 @@ document.querySelectorAll("[data-layer]").forEach(
   (b) =>
     (b.onclick = () => {
       layer = b.dataset.layer;
-      topic = layer === "mar" ? "" : layer;
+      topic = selectedMapTopic();
       fromLayer = Boolean(topic);
       period = "";
       query = "";
@@ -1147,6 +1220,7 @@ async function load() {
       )
         continue;
       if (run !== requested) return;
+      mappedItems = layerRecords(data.items);
       panel = data;
       const age = Date.now() - Date.parse(panel.updatedAt);
       $("snapshotTime").textContent =

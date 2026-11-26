@@ -36,6 +36,14 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Preparar la lectura de boletines oficiales en PDF
+        run: |
+          if ! command -v pdftotext >/dev/null; then
+            if ! (sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 update -qq &&
+                  sudo apt-get -o Acquire::Retries=1 install -y --no-install-recommends poppler-utils); then
+              echo "::warning::Extractor PDF temporalmente no disponible. Se conservarán las fichas oficiales y se reintentará en el siguiente ciclo."
+            fi
+          fi
       - name: Recuperar, contrastar y guardar la edición
         run: node scripts/estado-ci.mjs
         env:

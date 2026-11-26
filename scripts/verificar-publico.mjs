@@ -52,6 +52,50 @@ function privateKeys(obj, where, issues) {
   }
 }
 
+const senamhiNotices = new Set(['senamhi-lluvias','senamhi-quebradas','senamhi-meteo','senamhi-rios']);
+
+function checkCoenDocument(item, asOf, where, issues) {
+  if (!item.coenDocument && !item.originNotice && item.regionOrigin!=='pdf-coen') return;
+  const doc = item.coenDocument;
+  if (item.sourceId!=='coen' || !doc || Array.isArray(doc) || typeof doc!=='object') {
+    issues.push(where+' · detalle de COEN sin documento atribuido al emisor');
+    return;
+  }
+  let pathValid = false;
+  if (publicUrl(doc.pdfUrl,'portal.indeci.gob.pe')) {
+    const pdf = new URL(doc.pdfUrl);
+    pathValid = pdf.hostname==='portal.indeci.gob.pe' && !pdf.search && !pdf.hash &&
+      /^\/wp-content\/uploads\/20\d{2}\/\d{2}\/[^/]+\.pdf$/i.test(pdf.pathname) &&
+      !/[%](?:2f|5c)|[\x00-\x1f]/i.test(pdf.pathname);
+  }
+  if (!pathValid || !Array.isArray(item.coverageUrls) || !item.coverageUrls.includes(doc.pdfUrl))
+    issues.push(where+' · PDF de COEN sin referencia pública válida');
+  const keys = new Set(['pdfUrl','sha256','parserVersion','checkedAt','etag','lastModified']);
+  if (Object.keys(doc).some(k=>!keys.has(k)) || !/^[a-f0-9]{64}$/i.test(doc.sha256) ||
+      !Number.isInteger(doc.parserVersion) || doc.parserVersion < 1 || !isTimestamp(doc.checkedAt) ||
+      Date.parse(doc.checkedAt)>asOf+300000)
+    issues.push(where+' · metadatos del PDF inválidos');
+  if (doc.etag!=null && (typeof doc.etag!=='string' || doc.etag.length>160 || /[\r\n]/.test(doc.etag)))
+    issues.push(where+' · validador del PDF inválido');
+  checkPrivacy(doc,['etag'],where,issues);
+  if (doc.lastModified!=null && (!Number.isFinite(Date.parse(doc.lastModified)) ||
+      new Date(doc.lastModified).toUTCString()!==doc.lastModified))
+    issues.push(where+' · fecha HTTP del PDF inválida');
+  const origin = item.originNotice;
+  if (origin && (!senamhiNotices.has(origin.sourceId) || typeof origin.number!=='string' || !/^\d{1,6}$/.test(origin.number) ||
+      typeof origin.year!=='string' || !/^20\d{2}$/.test(origin.year) || Object.keys(origin).some(k=>!['sourceId','number','year'].includes(k))))
+    issues.push(where+' · referencia original de SENAMHI inválida');
+  if (item.invalidValidity && (item.validFrom || item.validUntil))
+    issues.push(where+' · documento con vigencia contradictoria');
+  checkPrivacy(item,['phenomenon'],where,issues);
+  for (const [region,provinces] of Object.entries(item.provincesByRegion ?? {})) {
+    if (!Array.isArray(provinces) || !item.regions?.includes(region) || provinces.some(v=>!isText(v))) {
+      issues.push(where+' · desglose provincial incoherente'); continue;
+    }
+    for (const value of [region,...provinces]) checkPrivacy({value},['value'],where,issues);
+  }
+}
+
 function checkSnapshot(p, files, issues, notes) {
   if (!p || typeof p!=='object' || ![1,2].includes(p.schemaVersion) || !isTimestamp(p.updatedAt) || !Array.isArray(p.sources) || !p.sources.length || !Array.isArray(p.items)) {
     issues.push('panorama · estructura, fuentes o fecha de actualización inválidas'); return;
@@ -89,6 +133,7 @@ function checkSnapshot(p, files, issues, notes) {
       if (it[field]!=null && !isTimestamp(it[field])) issues.push(where+'.'+field+' · fecha inválida');
     }
     checkPrivacy(it,['title','summary','locality','region'],where,issues);
+    checkCoenDocument(it,asOf,where,issues);
     if(it.supersededBy && (!isText(it.supersededBy) || !publicUrl(it.supersededUrl,new URL(registry.get(it.sourceId).url).hostname))) issues.push(where+' · actualización sin referencia del emisor');
     for (const u of it.coverageUrls ?? []) if (it.kind!=='oficial' || !publicUrl(u,new URL(registry.get(it.sourceId).url).hostname)) issues.push(where+' · visor territorial con origen inválido');
     for (const part of it.coastalScope ?? []) {
