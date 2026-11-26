@@ -1,6 +1,6 @@
-# Perú al Día · Atlas de El Niño
+# Perú al Día · El Niño hoy
 
-Piloto ciudadano con cartografía del Perú, observaciones del mar, avisos oficiales y un comparador histórico. Las páginas y sus recursos públicos están en `public/`. La fecha de cada observación y la hora de consulta de cada fuente aparecen en la interfaz.
+Piloto ciudadano con cartografía del Perú, observaciones del mar, intensidad del calentamiento y avisos oficiales por región. Las páginas y sus recursos públicos están en `public/`. La fecha de cada observación y la hora de consulta de cada fuente aparecen en la interfaz.
 
 ## Uso local
 
@@ -21,6 +21,10 @@ node --env-file=.env.local scripts/servidor.mjs --actualizar
 
 GitHub Pages entrega únicamente la carpeta pública. GitHub Actions consulta las fuentes con la frecuencia configurada para cada conector. La ejecución depende de la disponibilidad del programador y de la entidad emisora. El archivo del panorama conserva la última lectura exitosa si un proveedor falla. Los visores que requieren consulta directa se presentan como enlaces. Los registros de agua y carreteras pueden tener causas distintas del fenómeno El Niño.
 
+Las capas de lluvias y ríos muestran avisos oficiales vigentes, próximos y reportes con menos de 72 horas sin vigencia definida. La capa Mar combina la anomalía térmica diaria de NOAA con los tramos que Hidrografía identifica en sus avisos de oleaje. El filtro regional incluye las jurisdicciones cuyo litoral cruza esos tramos. La ficha enlaza el aviso original y distingue los niveles que SENAMHI asigna a distintos sectores de una región.
+
+El indicador de récord consulta diariamente la serie semanal de temperatura Niño 1+2 de NOAA. Muestra el máximo de la serie, su semana y la climatología de referencia. Si la fuente falla, continúa disponible la última observación verificada.
+
 Los boletines de las 07:00, 13:00 y 19:00 de Perú se preparan en la primera ejecución disponible del turno. La IA selecciona publicaciones oficiales. El publicador contrasta el guion con la transcripción antes de guardar la narración. Si la voz no se puede verificar, la edición sigue disponible en texto. Las solicitudes a OpenAI se realizan en el publicador. El archivo de audio se genera por edición y se comparte entre visitantes.
 
 ### Operación de las claves
@@ -34,4 +38,4 @@ Guardar el vencimiento del período de crédito confirmado en la variable de Act
 - `lib/oficiales.mjs` y `lib/medios.mjs` definen los canales, sus intervalos de consulta y los formatos aceptados.
 - `lib/panorama.mjs` construye el registro y conserva la procedencia, las revisiones y las fechas de los avisos.
 - `lib/boletines.mjs` prepara las ediciones, verifica el audio y limita los intentos con reservas persistentes.
-- `public/atlas/` contiene cartografía, cuadrícula NOAA y créditos. `public/historia.html` incorpora la comparación satelital y sus fuentes.
+- `public/atlas/` contiene cartografía, cuadrícula NOAA y créditos.

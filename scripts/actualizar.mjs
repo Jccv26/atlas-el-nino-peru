@@ -1,4 +1,4 @@
-import {mkdir, readFile, rename, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, rename, stat, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
@@ -20,15 +20,29 @@ export async function save(file, value) {
   await writeFile(tmp, JSON.stringify(value));
   await rename(tmp, file);
 }
-export async function actualizar({force = false, ai = true} = {}) {
+export async function actualizar({force = false, ai = true, bulletin: buildBulletin = true} = {}) {
   const previous = await readJSON(destination, {});
   const snapshot = await refreshPanorama(previous, {force});
-  if (ai && process.env.OPENAI_API_KEY && snapshot.sources.some(s => s.kind === 'oficial' && s.status === 'ok')) {
+  if (buildBulletin && snapshot.sources.some(s => s.kind === 'oficial' && s.status === 'ok')) {
     try {
-      const {generateBulletin} = await import('../lib/boletines.mjs');
+      const {generateBulletin,apiCreditActive} = await import('../lib/boletines.mjs');
+      const useAI = ai && apiCreditActive();
       const bulletin = await generateBulletin({items:snapshot.items, sources:snapshot.sources, stateDir,
-        audioDir:path.join(publicDir,'media'), audioBaseUrl:process.env.ATLAS_AUDIO_BASE || 'media/', audio:true});
-      if (bulletin) snapshot.bulletin = bulletin;
+        audioDir:path.join(publicDir,'media'), audioBaseUrl:process.env.ATLAS_AUDIO_BASE || 'media/', audio:useAI, useAI});
+      if (bulletin) {
+        const last = snapshot.bulletin;
+        if (!useAI && last?.id === bulletin.id && last.mode === 'seleccion-ia') {
+          // Refreshing sources cannot invalidate the already published narration.
+          if (last.audioUrl) {
+            const match = /^\/?media\/(boletin-\d{4}-\d{2}-\d{2}-(?:07|13|19)\.(?:wav|mp3))$/.exec(last.audioUrl);
+            const found = match && await stat(path.join(publicDir,'media',match[1])).catch(()=>null);
+            if (!found?.isFile()) {
+              delete last.audioUrl;
+              delete last.voiceType;
+            }
+          }
+        } else snapshot.bulletin = bulletin;
+      }
     } catch { console.error('No se pudo generar esta edición. Se conservan los avisos oficiales.'); }
   }
   await save(destination, snapshot);

@@ -1,4 +1,4 @@
-import { createMap } from "./atlas-map.mjs";
+import { createMap } from "./atlas-map.mjs?v=2";
 const $ = (id) => document.getElementById(id);
 const node = (tag, text = "", css = "") => {
   const el = document.createElement(tag);
@@ -42,39 +42,23 @@ const knownRegions = [
   "Tumbes",
   "Ucayali",
 ];
-const history = {
-  1983: [
-    "1982–1983",
-    "Las lluvias se extendieron a Tumbes y Piura durante los últimos meses de 1982 y continuaron en la costa norte en 1983.",
-    "SENAMHI",
-    "https://idesep.senamhi.gob.pe/portalidesep/idesep_tema_evento_el_nino_la_nina_nino_82_83.jsp",
-  ],
-  1998: [
-    "1997–1998",
-    "El río Ica se desbordó el 29 de enero de 1998. El comparador permite explorar el estado del Pacífico en octubre de 1997 frente a octubre de 2026.",
-    "INEI",
-    "https://proyectos.inei.gob.pe/web/biblioineipub/bancopub/est/lib0270/sub12.htm",
-  ],
-  2017: [
-    "Niño costero de 2017",
-    "El 27 de marzo de 2017 se desbordó el río Piura. ENFEN describe este episodio como un evento de características costeras locales.",
-    "INDECI",
-    "https://portal.indeci.gob.pe/wp-content/uploads/2019/01/20171221162233.pdf",
-  ],
-  2026: [
-    "Episodio de 2026",
-    "El comunicado del 13 de noviembre proyectó que la magnitud extraordinaria del calentamiento costero se mantendría hasta febrero de 2027. Consulta las actualizaciones de ENFEN.",
-    "ENFEN",
-    enfenUrl,
-  ],
-};
+const regionLabel = (name) => (name === "Lima" ? "Lima Provincias" : name);
+function findRegion(name) {
+  return (
+    knownRegions.find(
+      (n) => fold(n) === fold(name) || fold(regionLabel(n)) === fold(name),
+    ) || ""
+  );
+}
 let panel = null,
   layer = "mar",
   feed = "oficial",
   region = "",
   query = "",
   topic = "",
-  limit = 12,
+  period = "",
+  fromLayer = false,
+  limit = 8,
   map = null,
   oceanTime = null,
   oceanProduct = "",
@@ -121,11 +105,6 @@ function link(text, url) {
   }
   return a;
 }
-function internal(text, href) {
-  const a = node("a", text);
-  a.href = href;
-  return a;
-}
 function dialog(kind, title, ...content) {
   $("dialogKind").textContent = kind;
   $("dialogTitle").textContent = title;
@@ -170,18 +149,95 @@ function places(item) {
         .filter(Boolean);
 }
 function inRegion(item, name) {
-  return places(item).some((v) => fold(v) === fold(name));
+  return regionNamesFor(item).some((v) => fold(v) === fold(name));
 }
-function recent(item) {
-  const d = eventTime(item),
-    t = d ? ending(d) : NaN;
+function regionNamesFor(item) {
+  return [
+    ...new Set([
+      ...places(item),
+      ...(Array.isArray(item.coastalRegions) ? item.coastalRegions : []),
+    ]),
+  ];
+}
+function coastalSegments(item, area) {
+  const segments = item.coastalByRegion?.[area] || item.coastalScope;
+  return Array.isArray(segments) ? segments : [];
+}
+function startOf(value) {
+  return value
+    ? Date.parse(
+        /^\d{4}-\d{2}-\d{2}$/.test(value) ? value + "T00:00:00-05:00" : value,
+      )
+    : NaN;
+}
+const periodNames = {
+  vigente: "Vigente",
+  proximo: "Próximo",
+  finalizado: "Finalizado",
+  publicado: "Sin vigencia definida",
+  actualizado: "Sustituido",
+};
+function validity(item, now = Date.now()) {
+  if (item.supersededBy) return "actualizado";
+  const start = startOf(item.validFrom),
+    end = ending(item.validUntil);
+  if (end < now) return "finalizado";
+  if (start > now) return "proximo";
+  if (start <= now && end >= now) return "vigente";
+  return "publicado";
+}
+function mapPeriod(item) {
+  const state = validity(item);
+  if (state === "vigente") return "active";
+  if (state === "proximo") return "upcoming";
+  const age = Date.now() - startOf(eventTime(item));
+  return state === "publicado" && age >= 0 && age <= 72 * 3600000
+    ? "recent"
+    : "";
+}
+function onLayer(item) {
+  if (item.kind !== "oficial" || !mapPeriod(item)) return false;
+  if (layer === "mar") return item.sourceId === "marina";
+  if (item.sourceId === "coen")
+    return layer === "rios"
+      ? item.category === "Ríos"
+      : ["Lluvias", "Quebradas"].includes(item.category) ||
+          (item.category === "Ríos" &&
+            /lluvias|precipitaci/.test(fold(item.title)));
+  if (!item.sourceId.startsWith("senamhi-")) return false;
+  if (layer === "rios") return item.sourceId === "senamhi-rios";
   return (
-    item.kind === "oficial" &&
-    Number.isFinite(t) &&
-    t <= Date.now() + 86400000 &&
-    (item.validUntil
-      ? ending(item.validUntil) >= Date.now()
-      : t >= Date.now() - 72 * 3600000)
+    ["senamhi-lluvias", "senamhi-quebradas"].includes(item.sourceId) ||
+    (item.sourceId === "senamhi-meteo" && topics(item).lluvias)
+  );
+}
+function levelFor(item, area = "") {
+  const levels =
+    area &&
+    item.regionLevels &&
+    Object.entries(item.regionLevels).find(
+      ([key]) => fold(key) === fold(area),
+    )?.[1];
+  if (Array.isArray(levels) && levels.length)
+    return (
+      "Sectores en " + levels.map((x) => String(x).toLowerCase()).join(", ")
+    );
+  return item.level
+    ? "Nivel del aviso · " + String(item.level).toLowerCase()
+    : "";
+}
+function localContext(item) {
+  if (region && inRegion(item, region)) return regionLabel(region);
+  const names = regionNamesFor(item).map(regionLabel);
+  if (names.length > 2)
+    return names.slice(0, 2).join(", ") + " y " + (names.length - 2) + " más";
+  return (
+    names.join(", ") ||
+    (item.sourceId === "enfen"
+      ? "Pacífico tropical"
+      : coastalSegments(item).length
+        ? "Litoral peruano"
+        : "")
   );
 }
 function showRecord(item) {
@@ -199,8 +255,76 @@ function showRecord(item) {
   if (dates.length) fields.push(node("p", dates.join(" · ")));
   if (places(item).length)
     fields.push(node("p", "Ámbito mencionado: " + places(item).join(", ")));
-  if (item.level)
-    fields.push(node("p", "Nivel informado por la fuente: " + item.level));
+  if (item.supersededBy)
+    fields.push(
+      link(
+        "Actualizado por el aviso n.º " + item.supersededBy + " ↗",
+        item.supersededUrl,
+      ),
+    );
+  const level = levelFor(item, region);
+  if (level)
+    fields.push(
+      node(
+        "p",
+        level + (region && item.regionLevels?.[region] ? " · " + region : ""),
+      ),
+    );
+  const segments = coastalSegments(item, region);
+  if (segments.length) {
+    fields.push(
+      node(
+        "h3",
+        region && item.coastalByRegion?.[region]
+          ? "Tramo del litoral de " + regionLabel(region)
+          : "Tramos del aviso de oleaje",
+      ),
+    );
+    for (const seg of segments) {
+      fields.push(node("strong", seg.zone + " · " + seg.stretch));
+      for (const note of seg.conditions || []) fields.push(node("p", note));
+    }
+    if (item.coastalMappingSource?.url)
+      fields.push(
+        node(
+          "p",
+          "La jurisdicción se identifica por la parte de su litoral comprendida entre los puntos que indica la Marina.",
+        ),
+        link(
+          "Referencia geográfica de los tramos ↗",
+          item.coastalMappingSource.url,
+        ),
+      );
+  }
+  for (const [i, url] of (item.coverageUrls || []).entries()) {
+    if (safeUrl(url))
+      fields.push(
+        link(
+          (["senamhi-lluvias", "senamhi-quebradas"].includes(item.sourceId)
+            ? "Visor actual de SENAMHI"
+            : "Mapa oficial de cobertura") +
+            (item.coverageUrls.length > 1 ? " · " + (i + 1) : "") +
+            " ↗",
+          url,
+        ),
+      );
+  }
+  if (item.regionCoverageRetainedAt)
+    fields.push(
+      node(
+        "p",
+        "Ámbito territorial recuperado en la lectura del " +
+          dateTime(item.regionCoverageRetainedAt) +
+          ".",
+      ),
+    );
+  if (item.regionOrigin === "mapa-senamhi")
+    fields.push(
+      node(
+        "p",
+        "Ámbito territorial publicado en el mapa del aviso de SENAMHI.",
+      ),
+    );
   if (item.summary && fold(item.summary) !== fold(item.title))
     fields.push(node("p", item.summary));
   fields.push(link("Abrir publicación original ↗", item.url));
@@ -227,27 +351,44 @@ function renderItems() {
         (feed === "oficial" ? it.kind === "oficial" : it.kind !== "oficial")) &&
       (!region || inRegion(it, region)) &&
       (!topic || topics(it)[topic]) &&
+      (!period || validity(it) === period) &&
+      (!fromLayer || onLayer(it)) &&
       (!query ||
         fold(
-          [it.title, it.summary, it.sourceName, it.category, ...places(it)]
+          [
+            it.title,
+            it.summary,
+            it.sourceName,
+            it.category,
+            it.locality,
+            ...regionNamesFor(it),
+          ]
             .filter(Boolean)
             .join(" "),
         ).includes(fold(query))),
   );
+  $("feedScope").textContent = region
+    ? "Consulta regional"
+    : "Consulta nacional";
+  $("feedHeading").textContent = region
+    ? "Avisos de " + regionLabel(region)
+    : "Avisos y reportes";
   $("listCount").textContent = panel
     ? list.length +
-      " " +
-      (list.length === 1 ? "publicación" : "publicaciones") +
-      (region ? " · " + region : "")
+      (list.length === 1 ? " publicación" : " publicaciones") +
+      (fromLayer ? " de la capa " + layerNames[layer] : "") +
+      (list.length > limit ? " · mostrando " + limit : "")
     : "";
+  $("clearFilters").hidden =
+    !region && !query && !topic && !period && !fromLayer && feed === "oficial";
   $("items").replaceChildren();
   if (!list.length) {
     $("items").append(
       node(
         "p",
-        panel
-          ? "No hay publicaciones en esta selección. Consulta las fuentes o amplía los filtros."
-          : "La consulta está pendiente. Puedes abrir las fuentes oficiales desde sus enlaces.",
+        !panel
+          ? "Registro pendiente. Puedes consultar los enlaces de las entidades en Fuentes."
+          : "No encontramos publicaciones para esta selección. Puedes ampliar los filtros o consultar las fuentes.",
         "empty",
       ),
     );
@@ -256,56 +397,127 @@ function renderItems() {
     const b = node("button", "", "item");
     b.type = "button";
     const src = node("span", "", "item-source");
-    src.append(
-      node("span", item.sourceName || item.source || item.sourceId),
-      node("span", item.category || "Publicación", "tag"),
-    );
-    const stat =
-      item.validUntil && ending(item.validUntil) < Date.now()
-        ? " · Vigencia terminada"
-        : "";
-    b.append(
-      src,
-      node("b", item.title),
+    src.append(node("span", item.sourceName || item.source || item.sourceId));
+    const state = validity(item);
+    if (state !== "publicado")
+      src.append(
+        node("span", periodNames[state], "status-tag status-" + state),
+      );
+    const meta = node("span", "", "meta");
+    const level = levelFor(item, region);
+    if (level) meta.append(node("span", level, "level-tag"));
+    const area = localContext(item);
+    meta.append(
       node(
         "span",
-        (item.forecastDate
-          ? "Pronóstico del " + dateTime(item.forecastDate)
-          : dateTime(eventTime(item)) || "Ver fecha en la fuente") + stat,
-        "meta",
+        [area, dateTime(item.forecastDate || eventTime(item))]
+          .filter(Boolean)
+          .join(" · "),
       ),
-      node("span", "↗", "arrow"),
     );
+    b.append(src, node("b", item.title), meta, node("span", "→", "arrow"));
     b.onclick = () => showRecord(item);
     $("items").append(b);
   }
   $("more").hidden = list.length <= limit;
   $("queryState").hidden = !query;
-  $("queryState").querySelector("span").textContent = "Búsqueda: " + query;
-  if (region) {
-    const allHere = all.filter(
-      (it) =>
-        inRegion(it, region) &&
-        (layer === "mar" || (recent(it) && topics(it)[layer])),
-    );
-    $("regionTitle").textContent = region;
-    $("regionCount").textContent =
-      allHere.length +
-      " " +
-      (allHere.length === 1
-        ? "publicación asociada"
-        : "publicaciones asociadas") +
-      (layer === "mar" ? " en el registro." : " a esta capa.");
-  }
+  $("queryState").querySelector("span").textContent = "Búsqueda · " + query;
+  renderRegionCard(all);
+}
+const layerNames = { mar: "Mar", lluvias: "Lluvias", rios: "Ríos" };
+function renderRegionCard(all) {
+  $("regionCard").hidden = !region;
+  $("mapHint").hidden = !!region;
+  $("mapFrame").classList.toggle("has-region", Boolean(region));
+  if (!region) return;
+  const official = all.filter(
+    (it) => it.kind === "oficial" && inRegion(it, region),
+  );
+  const relevant = official.filter(onLayer);
+  const previews = (
+    layer === "mar" && !relevant.length ? official : relevant
+  ).slice(0, 2);
+  $("regionTitle").textContent = regionLabel(region);
+  const coverage =
+    relevant.length +
+    (relevant.length === 1 ? " aviso" : " avisos") +
+    " de " +
+    (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase());
+  $("regionCount").textContent = panel
+    ? coverage + " con ámbito identificado"
+    : "Consultando los avisos oficiales…";
+  $("regionPreviewLabel").hidden = !(previews.length && !relevant.length);
+  $("regionPreview").replaceChildren(
+    ...previews.map((it) => {
+      const b = node("button", "", "preview-link");
+      const coast = it.coastalByRegion?.[region];
+      const details = [
+        it.source || it.sourceName,
+        validity(it) === "publicado" ? "" : periodNames[validity(it)],
+        levelFor(it, region),
+      ].filter(Boolean);
+      b.append(
+        node("small", details.join(" · ")),
+        node(
+          "span",
+          coast?.length
+            ? coast.map((seg) => seg.stretch).join(" · ")
+            : it.title,
+        ),
+      );
+      b.onclick = () => showRecord(it);
+      return b;
+    }),
+  );
+  $("regionGo").textContent = relevant.length
+    ? "Ver avisos de " +
+      (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase()) +
+      " ↓"
+    : "Ver avisos de " + regionLabel(region) + " ↓";
+  $("otherRegion").hidden = !relevant.length;
+  $("otherRegion").onclick = () => {
+    topic = "";
+    period = "";
+    query = "";
+    fromLayer = false;
+    feed = "oficial";
+    changed();
+  };
+  $("regionGo").onclick = () => {
+    query = "";
+    period = "";
+    feed = "oficial";
+    fromLayer = relevant.length > 0;
+    topic = fromLayer ? layer : "";
+    syncControls();
+    renderItems();
+    saveLocation();
+  };
 }
 function syncLayer() {
-  const counts = new Map();
-  if (layer !== "mar")
-    for (const it of panel?.items || [])
-      if (recent(it) && topics(it)[layer])
-        for (const p of new Set(places(it)))
-          counts.set(p, (counts.get(p) || 0) + 1);
-  map?.showLayer(layer, counts);
+  const counts = new Map(),
+    regionTotals = new Map(),
+    regionStatus = new Map();
+  for (const it of panel?.items || []) {
+    const state = onLayer(it) && mapPeriod(it);
+    for (const name of regionNamesFor(it)) {
+      regionTotals.set(name, (regionTotals.get(name) || 0) + 1);
+      if (!state) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+      const stats = regionStatus.get(name) || {
+        active: 0,
+        upcoming: 0,
+        recent: 0,
+      };
+      stats[state]++;
+      regionStatus.set(name, stats);
+    }
+  }
+  map?.showLayer(layer, counts, {
+    loaded: Boolean(panel),
+    regionTotals,
+    regionStatus,
+  });
   map?.select(region);
   document.querySelectorAll("[data-layer]").forEach((b) => {
     const enable = b.dataset.layer === layer;
@@ -318,6 +530,98 @@ function syncLayer() {
       : layer === "rios"
         ? "Ríos · regiones con reportes"
         : "Lluvias · regiones con reportes";
+  $("coverageText").textContent = panel
+    ? (counts.size
+        ? counts.size +
+          (counts.size === 1 ? " zona con avisos" : " zonas con avisos")
+        : "Sin regiones identificadas") +
+      (layer === "mar" ? " de oleaje" : " en esta capa")
+    : "Consultando cobertura…";
+  const layerSources =
+    layer === "mar"
+      ? ["marina"]
+      : layer === "rios"
+        ? ["coen", "senamhi-rios"]
+        : ["coen", "senamhi-lluvias", "senamhi-quebradas", "senamhi-meteo"];
+  const delayed = (panel?.sources || []).filter(
+    (s) => layerSources.includes(s.id) && ["stale", "error"].includes(s.status),
+  );
+  if (delayed.length) $("coverageText").textContent += " · lectura parcial";
+  $("coverageText").disabled = !panel;
+  $("coverageText").onclick = () => {
+    const rows = node("div", "", "coverage-list");
+    for (const name of [...counts.keys()].sort((a, b) =>
+      a.localeCompare(b, "es"),
+    )) {
+      const info = regionStatus.get(name),
+        description = [];
+      if (info.active)
+        description.push(
+          info.active + (info.active === 1 ? " vigente" : " vigentes"),
+        );
+      if (info.upcoming)
+        description.push(
+          info.upcoming + (info.upcoming === 1 ? " próximo" : " próximos"),
+        );
+      if (info.recent)
+        description.push(
+          info.recent + (info.recent === 1 ? " reciente" : " recientes"),
+        );
+      const button = node("button");
+      button.append(
+        node("strong", regionLabel(name)),
+        node("span", description.join(" · ") + " →"),
+      );
+      button.onclick = () => {
+        $("infoDialog").close();
+        setRegion(name, true);
+        $("regionGo").focus({ preventScroll: true });
+      };
+      rows.append(button);
+    }
+    const why =
+      layer === "mar"
+        ? "Cada zona tiene litoral dentro de un tramo descrito en un aviso de Hidrografía. Toca una para ver el tramo y el pronóstico de oleaje."
+        : "Estas regiones figuran en avisos o reportes oficiales. La zona concreta y los niveles aparecen en cada publicación. Toca una región para consultarlos.";
+    const unlocated = (panel.items || []).filter(
+      (item) => onLayer(item) && !regionNamesFor(item).length,
+    );
+    const extra = node("details", "", "unlocated");
+    if (unlocated.length) {
+      extra.append(
+        node(
+          "summary",
+          unlocated.length +
+            (unlocated.length === 1
+              ? " publicación sin región identificada"
+              : " publicaciones sin región identificada"),
+        ),
+      );
+      for (const item of unlocated)
+        extra.append(link(item.title + " ↗", item.url));
+    }
+    dialog(
+      "Cobertura de la capa " + layerNames[layer],
+      counts.size ? "Regiones con avisos" : "Sin ámbito regional identificado",
+      node("p", why),
+      node(
+        "p",
+        "La vista nacional distingue 26 ámbitos. Lima Provincias, Lima Metropolitana y el Callao se pueden consultar por separado.",
+      ),
+      ...(delayed.length
+        ? [
+            node(
+              "p",
+              "Última consulta pendiente para " +
+                delayed.map((s) => s.name).join(", ") +
+                ". Se conserva la cobertura publicada anteriormente.",
+            ),
+          ]
+        : []),
+      rows,
+      ...(unlocated.length ? [extra] : []),
+    );
+  };
   $("scaleBar").hidden = layer !== "mar";
   $("scales").hidden = layer !== "mar";
   $("mapDetails").textContent =
@@ -328,9 +632,23 @@ function syncLayer() {
           (oceanProduct === "preliminary" ? " · Preliminar" : "") +
           "  ⓘ"
         : "Información de la capa  ⓘ"
-      : "Publicación regional reciente  ⓘ";
+      : "Criterios y fuentes de la capa  ⓘ";
 }
 $("mapDetails").onclick = () => {
+  const national = (panel?.items || []).filter(
+    (i) => onLayer(i) && !regionNamesFor(i).length,
+  );
+  const shared = [
+    node(
+      "p",
+      "Los contornos destacan regiones mencionadas en avisos oficiales vigentes, próximos o recientes. Consulta el aviso para identificar los sectores concretos.",
+    ),
+  ];
+  if (national.length) {
+    shared.push(node("h3", "Avisos sin región identificada"));
+    for (const item of national.slice(0, 8))
+      shared.push(link(item.title + " ↗", item.url));
+  }
   if (layer === "mar") {
     dialog(
       "Cartografía",
@@ -354,6 +672,7 @@ $("mapDetails").onclick = () => {
         oceanSource ||
           "https://www.ncei.noaa.gov/products/optimum-interpolation-sst",
       ),
+      ...shared,
     );
   } else {
     dialog(
@@ -363,93 +682,160 @@ $("mapDetails").onclick = () => {
         : "Reportes de lluvias y quebradas",
       node(
         "p",
-        "Un área resaltada indica que una fuente oficial menciona esa región en un reporte reciente o con vigencia abierta. El color cubre el ámbito administrativo; consulta la publicación para conocer las localidades afectadas.",
+        "El color cubre el límite administrativo de la región. El nivel puede variar entre provincias y distritos.",
       ),
       node(
         "p",
-        "Incluimos reportes con vigencia conocida o publicados en las últimas 72 horas. Un área sin color puede tener incidencias todavía sin registrar.",
+        "Incluimos avisos vigentes o próximos y reportes publicados en las últimas 72 horas sin vigencia definida. Una región sin colorear puede tener incidencias todavía sin registrar.",
       ),
+      ...shared,
     );
   }
 };
-function setRegion(n) {
-  region = n;
-  $("regionSelect").value = n;
-  $("regionCard").hidden = !n;
-  limit = 12;
-  map?.select(n);
-  renderItems();
+function syncControls() {
+  $("regionSelect").value = region;
+  $("mapRegion").value = region;
+  $("topic").value = topic;
+  $("period").value = period;
+  $("searchInput").value = query;
+  for (const b of document.querySelectorAll("[data-feed]")) {
+    const yes = b.dataset.feed === feed;
+    b.classList.toggle("selected", yes);
+    b.setAttribute("aria-pressed", String(yes));
+  }
 }
-$("closeRegion").onclick = () => setRegion("");
+function saveLocation() {
+  const url = new URL(location.href);
+  const fields = {
+    region,
+    capa: layer === "mar" ? "" : layer,
+    tema: topic,
+    tipo: feed === "oficial" ? "" : feed,
+    vigencia: period,
+    q: query,
+    mapa: fromLayer ? "1" : "",
+  };
+  for (const [key, value] of Object.entries(fields))
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  if (url.href !== location.href) window.history.replaceState(null, "", url);
+}
+function changed() {
+  limit = 8;
+  syncControls();
+  syncLayer();
+  renderItems();
+  saveLocation();
+}
+function setRegion(name, viaMap = false) {
+  region = knownRegions.includes(name) ? name : "";
+  if (viaMap) {
+    feed = "oficial";
+    query = "";
+    period = "";
+    topic = layer === "mar" ? "" : layer;
+    fromLayer = Boolean(topic);
+  }
+  changed();
+}
+$("closeRegion").onclick = () => setRegion("", true);
 $("regionSelect").onchange = (e) => setRegion(e.target.value);
+$("mapRegion").onchange = (e) => setRegion(e.target.value, true);
 $("topic").onchange = (e) => {
   topic = e.target.value;
-  limit = 12;
-  renderItems();
+  fromLayer = false;
+  changed();
+};
+$("period").onchange = (e) => {
+  period = e.target.value;
+  changed();
 };
 document.querySelectorAll("[data-layer]").forEach(
   (b) =>
     (b.onclick = () => {
       layer = b.dataset.layer;
       topic = layer === "mar" ? "" : layer;
-      $("topic").value = topic;
-      limit = 12;
-      syncLayer();
-      renderItems();
+      fromLayer = Boolean(topic);
+      period = "";
+      query = "";
+      feed = "oficial";
+      changed();
     }),
 );
 document.querySelectorAll("[data-feed]").forEach(
   (b) =>
     (b.onclick = () => {
       feed = b.dataset.feed;
-      limit = 12;
-      document.querySelectorAll("[data-feed]").forEach((k) => {
-        const yes = k === b;
-        k.classList.toggle("selected", yes);
-        k.setAttribute("aria-pressed", String(yes));
-      });
-      renderItems();
+      fromLayer = false;
+      changed();
     }),
 );
+$("clearFilters").onclick = () => {
+  query = "";
+  region = "";
+  feed = "oficial";
+  topic = "";
+  period = "";
+  fromLayer = false;
+  layer = "mar";
+  changed();
+};
 $("more").onclick = () => {
-  limit += 15;
+  const shown = limit;
+  limit += 12;
   renderItems();
+  $("items").children[shown]?.focus({ preventScroll: true });
 };
 $("queryState").querySelector("button").onclick = () => {
   query = "";
-  $("searchInput").value = "";
-  renderItems();
+  changed();
 };
 $("searchForm").onsubmit = (e) => {
   e.preventDefault();
-  const q = $("searchInput").value.trim(),
-    match = knownRegions.find((n) => fold(n) === fold(q));
+  const q = $("searchInput").value.trim().slice(0, 100);
+  const match = findRegion(q);
   query = match ? "" : q;
   topic = "";
-  $("topic").value = "";
+  fromLayer = false;
+  period = "";
+  feed = "oficial";
   setRegion(match || "");
-  $("avisos").scrollIntoView();
+  if (location.hash !== "#avisos") location.hash = "avisos";
+  else $("avisos").scrollIntoView();
 };
+$("searchInput").addEventListener("search", () => {
+  if (!$("searchInput").value && query) {
+    query = "";
+    changed();
+  }
+});
 for (const n of knownRegions) {
-  $("regionSelect").append(new Option(n, n));
-  $("places").append(new Option(n, n));
+  $("regionSelect").append(new Option(regionLabel(n), n));
+  $("mapRegion").append(new Option(regionLabel(n), n));
+  $("places").append(new Option(regionLabel(n), regionLabel(n)));
 }
-document.querySelectorAll("[data-year]").forEach(
-  (b) =>
-    (b.onclick = () => {
-      document
-        .querySelectorAll("[data-year]")
-        .forEach((k) => k.classList.toggle("chosen", k === b));
-      const [title, body, issuer, url] = history[b.dataset.year];
-      dialog(
-        "Memoria de El Niño",
-        title,
-        node("p", body),
-        link("Consultar " + issuer + " ↗", url),
-        internal("Explorar el comparador →", "./historia.html"),
-      );
-    }),
-);
+function restoreLocation() {
+  const q = new URLSearchParams(location.search);
+  region = findRegion(q.get("region"));
+  layer = ["rios", "lluvias"].includes(q.get("capa")) ? q.get("capa") : "mar";
+  feed = ["todos", "prensa"].includes(q.get("tipo"))
+    ? q.get("tipo")
+    : "oficial";
+  topic = ["agua", "rios", "lluvias", "mar"].includes(q.get("tema"))
+    ? q.get("tema")
+    : "";
+  period = Object.hasOwn(periodNames, q.get("vigencia"))
+    ? q.get("vigencia")
+    : "";
+  fromLayer = q.get("mapa") === "1" && topic === layer && feed === "oficial";
+  query = (q.get("q") || "").slice(0, 100);
+  limit = 8;
+  syncControls();
+  syncLayer();
+  renderItems();
+}
+window.addEventListener("popstate", restoreLocation);
+restoreLocation();
 const fallbackSources = [
   ["COEN · INDECI", "https://portal.indeci.gob.pe/emergencias/"],
   ["ENFEN", enfenUrl],
@@ -474,6 +860,7 @@ function renderSources() {
   $("sourceList").replaceChildren(
     ...sources.map((s) => {
       const d = node("div", "", "source-row");
+      d.dataset.status = s.status;
       d.append(
         link(s.name + " ↗", s.url),
         node(
@@ -490,6 +877,110 @@ function renderSources() {
     }),
   );
 }
+let weekly = null;
+const weeklySource = "https://www.cpc.ncep.noaa.gov/data/indices/wksst9120.for";
+const degree = (number) =>
+  (number > 0 ? "+" : "") +
+  new Intl.NumberFormat("es-PE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })
+    .format(number)
+    .replace(".", ",");
+const fullDate = (day) =>
+  new Intl.DateTimeFormat("es-PE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(day + "T12:00:00Z"));
+async function loadWeekly() {
+  try {
+    const r = await fetch("./data/temperatura.json", {
+      cache: "no-cache",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (
+      d.sourceUrl !== weeklySource ||
+      !Number.isFinite(d.record?.anomaly) ||
+      !Number.isFinite(d.latest?.anomaly) ||
+      !Array.isArray(d.record?.dates)
+    )
+      return;
+    const date = fullDate(d.record.date),
+      since = fullDate(d.seriesStart);
+    $("recordValue").replaceChildren(
+      document.createTextNode(degree(d.record.anomaly) + " "),
+      node("small", "°C"),
+    );
+    $("recordDescription").textContent =
+      "En la semana centrada en el " +
+      date +
+      ", la región Niño 1+2 " +
+      (d.record.dates.length > 1 ? "igualó" : "alcanzó") +
+      " la mayor anomalía semanal de la serie de NOAA, iniciada en " +
+      since.slice(-4) +
+      ".";
+    weekly = d;
+  } catch {
+    /* The dated, verified observation stays available offline. */
+  }
+}
+$("recordDetails").onclick = () => {
+  const parts = [
+    node(
+      "p",
+      "NOAA calcula el promedio de temperatura de la superficie del mar en la región Niño 1+2, frente a Ecuador y el norte del Perú. La anomalía es la diferencia respecto del promedio de esa semana entre 1991 y 2020.",
+    ),
+  ];
+  if (weekly) {
+    parts.push(
+      node("h3", "Última medición de la serie"),
+      node(
+        "p",
+        "Semana centrada en el " +
+          fullDate(weekly.latest.date) +
+          " · " +
+          degree(weekly.latest.anomaly) +
+          " °C sobre la referencia. Temperatura observada: " +
+          String(weekly.latest.sst).replace(".", ",") +
+          " °C.",
+      ),
+    );
+    parts.push(
+      node(
+        "p",
+        "La serie analizada tiene " +
+          new Intl.NumberFormat("es-PE").format(weekly.weeks) +
+          " semanas, del " +
+          fullDate(weekly.seriesStart) +
+          " al " +
+          fullDate(weekly.seriesEnd) +
+          ".",
+      ),
+    );
+  } else
+    parts.push(
+      node(
+        "p",
+        "El dato de portada corresponde a la serie consultada el 26 de noviembre de 2026.",
+      ),
+    );
+  parts.push(
+    node(
+      "p",
+      "El récord describe una semana y una zona del océano. Para evaluar un episodio completo, ENFEN y NOAA también examinan índices de varios meses y la respuesta de la atmósfera.",
+    ),
+    link("Serie semanal original · NOAA ↗", weeklySource),
+    link(
+      "Índices y metodología · NOAA ↗",
+      "https://www.cpc.ncep.noaa.gov/data/indices/",
+    ),
+  );
+  dialog("Medición observada", "Cómo se mide este récord", ...parts);
+};
 function updateClimate() {
   const fresh = panel?.items
     ?.filter((i) => i.sourceId === "enfen" && i.publishedAt)
@@ -501,7 +992,12 @@ function updateClimate() {
     return;
   $("magLabel").textContent = "Última actualización de ENFEN";
   $("magnitude").textContent = "Nuevo comunicado";
-  $("outlook").textContent = fresh.title;
+  $("outlook").textContent = fresh.summary
+    ? (
+        fresh.summary.match(/^[^.!?]+[.!?](?:\s|$)/u)?.[0] ||
+        fresh.summary.slice(0, 190)
+      ).trim()
+    : fresh.title;
   $("climateSource").textContent =
     "ENFEN · " + dateTime(fresh.publishedAt.slice(0, 10));
   $("climateLink").href = safeUrl(fresh.url) || enfenUrl;
@@ -518,7 +1014,7 @@ function audioText() {
 }
 function resetListening() {
   speaking = false;
-  $("listen").textContent = "▷  Escuchar resumen";
+  $("listen").textContent = "▷  Boletín nacional";
   $("listen").setAttribute("aria-pressed", "false");
 }
 function stopAudio() {
@@ -587,7 +1083,7 @@ $("listen").onclick = async () => {
   }
   const play = node("button", "▷  Reproducir", "outline-btn");
   parts.push(play);
-  dialog("Resumen de voz", "Escuchar el panorama", ...parts);
+  dialog("Boletín nacional", "El Niño hoy en el Perú", ...parts);
   play.onclick = async () => {
     if (speaking) {
       stopAudio();
@@ -676,7 +1172,7 @@ async function load() {
 }
 renderSources();
 createMap({
-  onRegion: setRegion,
+  onRegion: (name) => setRegion(name, true),
   onOceanReady: (t, s, product) => {
     oceanProduct = product;
     oceanTime = t;
@@ -691,13 +1187,66 @@ createMap({
   .catch(() => {
     $("mapDetails").textContent = "Cartografía no disponible  ⓘ";
   });
-load();
-setInterval(
-  () => {
-    if (!document.hidden) load();
-  },
-  5 * 60 * 1000,
-);
-document.querySelector('a[href="#fuentes"]').addEventListener("click", () => {
-  $("sourceDetails").open = true;
+let lastRefresh = 0;
+function refreshPage() {
+  if (document.hidden || Date.now() - lastRefresh < 60000) return;
+  lastRefresh = Date.now();
+  void load();
+  void loadWeekly();
+  void map?.refreshOcean?.();
+}
+refreshPage();
+setInterval(refreshPage, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", refreshPage);
+window.addEventListener("online", () => {
+  lastRefresh = 0;
+  refreshPage();
 });
+const navLinks = [...document.querySelectorAll(".mast nav a")];
+function activeSection() {
+  let name = "inicio";
+  for (const section of ["avisos", "fuentes"]) {
+    if (
+      $(section).getBoundingClientRect().top <=
+      Math.min(innerHeight * 0.45, 230)
+    )
+      name = section;
+  }
+  if (
+    name === "inicio" &&
+    location.hash === "#avisos" &&
+    $("avisos").getBoundingClientRect().top < innerHeight * 0.55
+  )
+    name = "avisos";
+  if (
+    location.hash === "#fuentes" &&
+    $("fuentes").getBoundingClientRect().top < innerHeight
+  )
+    name = "fuentes";
+  for (const a of navLinks) {
+    const active = a.hash === "#" + name;
+    a.classList.toggle("active", active);
+    if (active) a.setAttribute("aria-current", "location");
+    else a.removeAttribute("aria-current");
+  }
+}
+for (const a of navLinks)
+  a.addEventListener("click", () => {
+    if (a.hash === "#fuentes") $("sourceDetails").open = true;
+  });
+if (location.hash === "#fuentes") $("sourceDetails").open = true;
+let navFrame = false;
+window.addEventListener(
+  "scroll",
+  () => {
+    if (!navFrame) {
+      navFrame = true;
+      requestAnimationFrame(() => {
+        activeSection();
+        navFrame = false;
+      });
+    }
+  },
+  { passive: true },
+);
+activeSection();

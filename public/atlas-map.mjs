@@ -83,6 +83,230 @@ const labelData = [
   ["Cusco", -71.97, -13.53, 0.32, "city"],
   ["Arequipa", -71.54, -16.4, 0.31, "city"],
 ];
+// Keep the camera in geographic coordinates. The overlay marks remain the same
+// size in screen pixels as the user moves between national and regional views.
+function createCamera(map, onDraw) {
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const maxZoom = 9;
+  let width,
+    height,
+    baseHeight,
+    home,
+    state,
+    goal,
+    animation = 0;
+  function draw(next) {
+    const h = baseHeight / next.z,
+      w = (h * width) / height;
+    const x = w >= 49 ? 24.5 : nearest(next.x, w / 2, 49 - w / 2);
+    const y = h >= 31 ? 15.5 : nearest(next.y, h / 2, 31 - h / 2);
+    state = { x, y, z: next.z };
+    map.setAttribute("viewBox", [x - w / 2, y - h / 2, w, h].join(" "));
+    map.classList.toggle("map-zoomed", next.z > 1.02);
+    map.classList.toggle("atlas-detail-view", next.z >= 4);
+    $("zoomIn").disabled = next.z >= maxZoom - 0.01;
+    $("zoomOut").disabled = next.z <= 1.01;
+    onDraw(w / width);
+  }
+  function stop() {
+    cancelAnimationFrame(animation);
+    animation = 0;
+    goal = null;
+  }
+  function move(next, animate = true) {
+    stop();
+    goal = next;
+    if (!animate || reducedMotion.matches) {
+      draw(next);
+      return;
+    }
+    const start = { ...state },
+      startTime = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - startTime) / 490);
+      const ease = t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+      draw({
+        x: start.x + (next.x - start.x) * ease,
+        y: start.y + (next.y - start.y) * ease,
+        z: start.z * (next.z / start.z) ** ease,
+      });
+      if (t < 1) animation = requestAnimationFrame(tick);
+      else animation = 0;
+    }
+    animation = requestAnimationFrame(tick);
+  }
+  function resize() {
+    const box = map.getBoundingClientRect();
+    if (!box.height || !box.width) return;
+    if (width === box.width && height === box.height) return;
+    stop();
+    width = box.width;
+    height = box.height;
+    const ratio = width / height;
+    baseHeight =
+      width < 761
+        ? Math.max(22, 20.7 / ratio)
+        : Math.min(22.7, Math.max(20.4, 49 / ratio));
+    home = {
+      x: width < 761 ? 31 : 45 - (baseHeight * ratio) / 2,
+      y: width < 761 ? 15 : 14.65,
+      z: 1,
+    };
+    draw(state?.z > 1.01 ? state : home);
+  }
+  new ResizeObserver(resize).observe(map);
+  resize();
+  reducedMotion.addEventListener("change", () => {
+    if (animation && goal && reducedMotion.matches) move(goal, false);
+  });
+  return {
+    home: () => move(home),
+    stop,
+    snapshot: () => ({ ...state, scale: baseHeight / (state.z * height) }),
+    pan: (x, y) => draw({ x, y, z: state.z }),
+    zoomBy(factor) {
+      const target = nearest((goal?.z ?? state.z) * factor, 1, maxZoom);
+      move(target === 1 ? home : { ...state, z: target });
+    },
+    reveal(point) {
+      const view = map.viewBox.baseVal;
+      if (
+        Math.abs(point.x - state.x) > view.width * 0.43 ||
+        Math.abs(point.y - state.y) > view.height * 0.39
+      )
+        move({ x: point.x, y: point.y, z: Math.min(state.z, 3) });
+    },
+    fit(box) {
+      // At wider widths the climate and region cards flank the open map.
+      const available = width >= 1000 ? 0.43 : 0.67;
+      const z = nearest(
+        Math.min(
+          (((baseHeight * width) / height) * available) /
+            Math.max(0.1, box.width),
+          (baseHeight * 0.62) / Math.max(0.1, box.height),
+        ),
+        1.3,
+        7,
+      );
+      move({ x: box.x + box.width / 2, y: box.y + box.height / 2, z });
+    },
+  };
+}
+
+function regionAnchor(path) {
+  const b = path.getBBox();
+  // An inland anchor also works for concave shapes and regions with islands.
+  for (const dx of [0.5, 0.35, 0.65, 0.2, 0.8])
+    for (const dy of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+      const p = new DOMPoint(b.x + dx * b.width, b.y + dy * b.height);
+      if (path.isPointInFill(p)) return p;
+    }
+  return new DOMPoint(b.x + b.width / 2, b.y + b.height / 2);
+}
+function regionLabel(name) {
+  return name === "Lima" ? "Lima Provincias" : name;
+}
+function regionPicker(frame, names, choose) {
+  const wrap = frame.querySelector(".map-scope");
+  if (!wrap) return null;
+  wrap.classList.add("atlas-picker");
+  const visible = document.createElement("span");
+  visible.textContent = "Explorar regiones";
+  const existing = wrap.querySelector("select");
+  const select = existing || document.createElement("select");
+  select.classList.add("atlas-region-picker");
+  if (!existing) {
+    select.setAttribute("aria-label", "Explorar las regiones del mapa");
+    select.append(
+      new Option("Todo el Perú", ""),
+      ...names.map((n) => new Option(regionLabel(n), n)),
+    );
+    select.addEventListener("change", () => choose(select.value));
+  }
+  const icon = svg("svg", {
+    viewBox: "0 0 20 20",
+    width: 16,
+    height: 16,
+    "aria-hidden": "true",
+  });
+  icon.append(
+    svg("path", {
+      d: "M10 17s5.5-5.6 5.5-10a5.5 5.5 0 1 0-11 0c0 4.4 5.5 10 5.5 10z M12 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0z",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": 1.4,
+    }),
+  );
+  const arrow = document.createElement("span");
+  arrow.className = "atlas-chevron";
+  arrow.setAttribute("aria-hidden", "true");
+  wrap.replaceChildren(icon, visible, arrow, select);
+  return (name) => {
+    select.value = name;
+    visible.textContent = regionLabel(name) || "Explorar regiones";
+  };
+}
+
+const coast = new Set([
+  "Tumbes",
+  "Piura",
+  "Lambayeque",
+  "La Libertad",
+  "Áncash",
+  "Lima",
+  "Lima Metropolitana",
+  "Callao",
+  "Ica",
+  "Arequipa",
+  "Moquegua",
+  "Tacna",
+]);
+const temperature = new Intl.NumberFormat("es-PE", {
+  maximumFractionDigits: 2,
+  signDisplay: "exceptZero",
+});
+const dateOfGrid = new Intl.DateTimeFormat("es-PE", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+function validOceanGrid(data) {
+  if (!data || !Number.isFinite(Date.parse(data.time))) return false;
+  const { lons, lats, values } = data;
+  const regularAxis = (axis, direction) => {
+    if (!Array.isArray(axis) || axis.length < 2) return false;
+    const step = axis[1] - axis[0];
+    return (
+      step * direction > 0 &&
+      axis.every(
+        (coordinate, i) =>
+          Number.isFinite(coordinate) &&
+          Math.abs(coordinate - (axis[0] + i * step)) < 0.000001,
+      )
+    );
+  };
+  return (
+    regularAxis(lons, 1) &&
+    regularAxis(lats, -1) &&
+    Array.isArray(values) &&
+    values.length === lons.length * lats.length &&
+    values.every((value) => value === null || Number.isFinite(value)) &&
+    values.some(Number.isFinite)
+  );
+}
+
+function oceanCell(grid, point) {
+  if (!grid) return null;
+  const { lons, lats, values } = grid;
+  const col = Math.round((point.x - 105 - lons[0]) / (lons[1] - lons[0]));
+  const row = Math.round((6 - point.y - lats[0]) / (lats[1] - lats[0]));
+  if (col < 0 || col >= lons.length || row < 0 || row >= lats.length)
+    return null;
+  const value = values[row * lons.length + col];
+  if (!Number.isFinite(value)) return null;
+  return { x: lons[col] + 105, y: 6 - lats[row], value };
+}
 export async function createMap({ onRegion, onOceanReady }) {
   const map = $("map"),
     frame = map.parentElement,
@@ -95,17 +319,35 @@ export async function createMap({ onRegion, onOceanReady }) {
     $("countryLines").append(svg("path", { d: l.d, class: "country-path" }));
   });
   const regions = new Map();
-  geo.regions.forEach((r) => {
+  const names = geo.regions
+    .map((r) => r.name)
+    .sort((a, b) => a.localeCompare(b, "es"));
+  const anchors = new Map();
+  const regionGroup = $("regions");
+  regionGroup.setAttribute("role", "group");
+  regionGroup.setAttribute("aria-label", "Regiones del Perú");
+  const help = document.createElement("p");
+  help.id = "atlas-map-keys";
+  help.className = "atlas-sr";
+  help.textContent =
+    "Usa las flechas para recorrer las regiones por orden alfabético. Pulsa Intro para acercar y abrir su ficha, o Escape para volver a todo el Perú.";
+  frame.append(help);
+  geo.regions.forEach((r, i) => {
     const path = svg("path", {
+      id: "atlas-region-" + i,
       d: r.d,
       class: "region-path",
       "data-region": r.name,
+      role: "button",
+      tabindex: r.name === names[0] ? 0 : -1,
+      "aria-pressed": "false",
+      "aria-controls": "regionCard",
+      "aria-describedby": help.id,
+      "aria-label": regionLabel(r.name),
     });
-    const t = svg("title");
-    t.textContent = r.name;
-    path.append(t);
-    $("regions").append(path);
+    regionGroup.append(path);
     regions.set(r.name, path);
+    anchors.set(r.name, regionAnchor(path));
   });
   labelData.forEach(([label, lon, lat, size, kind]) => {
     if (kind === "city")
@@ -120,12 +362,16 @@ export async function createMap({ onRegion, onOceanReady }) {
         }),
       );
     const t = svg("text", {
-      x: lon + 105 + (kind === "city" ? 0.18 : 0),
+      x: lon + 105,
       y: 6 - lat,
       "font-size": size,
       "text-anchor": kind === "city" ? "start" : "middle",
-      class: "map-label",
+      class: "map-label " + kind,
     });
+    t.style.setProperty(
+      "--atlas-label-px",
+      kind === "city" ? 11 : kind === "nation" ? 17 : 13,
+    );
     if (kind === "ocean") {
       t.style.fill = "#d5e3de";
       t.style.letterSpacing = ".13px";
@@ -143,120 +389,504 @@ export async function createMap({ onRegion, onOceanReady }) {
     t.textContent = label;
     $("mapLabels").append(t);
   });
-  let zoom = 1,
-    center = null,
-    drag = null,
-    skipClick = false,
-    selected = "";
-  function redraw() {
-    const { width, height } = map.getBoundingClientRect(),
-      ratio = width / Math.max(1, height),
-      h0 =
-        width < 761
-          ? Math.max(22, 20.7 / ratio)
-          : Math.min(22.7, Math.max(20.4, 49 / ratio)),
-      h = h0 / zoom,
-      w = h * ratio;
-    const ref =
-      width < 761 ? [31, 15] : [Math.min(49 - w / 2, 45 - w / 2), 14.65];
-    const raw = center || ref,
-      x = w < 49 ? nearest(raw[0], w / 2, 49 - w / 2) : 24.5,
-      y = h < 31 ? nearest(raw[1], h / 2, 31 - h / 2) : 15.5;
-    map.setAttribute("viewBox", [x - w / 2, y - h / 2, w, h].join(" "));
-    $("zoomIn").disabled = zoom >= 4;
-    $("zoomOut").disabled = zoom <= 1;
+  $("mapLabels").setAttribute("pointer-events", "none");
+  $("mapLabels").setAttribute("aria-hidden", "true");
+  const art = svg("g", { class: "atlas-annotations", "aria-hidden": "true" });
+  $("mapWorld").append(art);
+  const outline = svg("path", { class: "atlas-outline", visibility: "hidden" });
+  const marker = svg("g", { class: "atlas-marker", visibility: "hidden" });
+  marker.append(
+    svg("circle", { r: 9, class: "atlas-marker-halo" }),
+    svg("circle", { r: 4, class: "atlas-marker-dot" }),
+  );
+  const markerText = svg("text", { x: 15, y: 4, class: "atlas-marker-label" });
+  marker.append(markerText);
+  // Give adjacent small territories distinct touch targets without enlarging
+  // their geographic polygons or swallowing taps on neighboring regions.
+  function cityTag(name, label, x, y, width) {
+    const group = svg("g", { "data-region": name, class: "atlas-callao" });
+    const left = x < 0 ? x - width : x;
+    const text = svg("text", {
+      x: left + width / 2,
+      y: y + 4,
+      "text-anchor": "middle",
+    });
+    text.textContent = label;
+    group.append(
+      svg("circle", { r: 2.5, class: "atlas-callao-dot" }),
+      svg("path", { d: "M0 0 L" + x + " " + y, class: "atlas-callao-line" }),
+      svg("rect", {
+        x: left,
+        y: y - 11,
+        width,
+        height: 22,
+        rx: 7,
+        class: "atlas-callao-tag",
+      }),
+      text,
+      svg("rect", {
+        x: left,
+        y: y - 22,
+        width,
+        height: 44,
+        fill: "transparent",
+        "pointer-events": "all",
+      }),
+    );
+    return { name, group, bounds: regions.get(name).getBBox() };
   }
-  const zoomBy = (f) => {
-    const b = map.viewBox.baseVal;
-    center = [b.x + b.width / 2, b.y + b.height / 2];
-    zoom = nearest(zoom * f, 1, 4);
-    if (zoom === 1) center = null;
-    redraw();
+  const compactTags = [
+    cityTag("Callao", "Callao", -9, 0, 46),
+    cityTag("Lima Metropolitana", "Lima Metropolitana", 10, -17, 107),
+  ];
+  const sampleMark = svg("g", {
+    class: "atlas-ocean-sample",
+    visibility: "hidden",
+  });
+  sampleMark.append(
+    svg("circle", { r: 4.5 }),
+    svg("path", { d: "M-8 0h3 M5 0h3 M0 -8v3 M0 5v3" }),
+  );
+  art.append(
+    outline,
+    marker,
+    ...compactTags.map((tag) => tag.group),
+    sampleMark,
+  );
+
+  const tip = document.createElement("div");
+  tip.className = "atlas-map-tip";
+  tip.hidden = true;
+  tip.setAttribute("aria-hidden", "true");
+  const tipTitle = document.createElement("strong"),
+    tipInfo = document.createElement("span");
+  tip.append(tipTitle, tipInfo);
+  frame.append(tip);
+  const announce = document.createElement("span");
+  announce.className = "atlas-sr";
+  announce.setAttribute("role", "status");
+  frame.append(announce);
+  const updatePicker = regionPicker(frame, names, onRegion);
+  let selected = "",
+    hover = "",
+    tabRegion = names[0],
+    layer = "mar",
+    grid = null,
+    sample = null;
+  let counts = new Map(),
+    states = null,
+    upcoming = null,
+    loaded = false,
+    drag = null,
+    skipClick = false;
+  let unit = 1,
+    activeTip = "",
+    keyboardRegion = "";
+  function pin(el, point) {
+    el.setAttribute(
+      "transform",
+      "translate(" + point.x + " " + point.y + ") scale(" + unit + ")",
+    );
+  }
+  function paintMarks(nextUnit) {
+    unit = nextUnit;
+    compactTags.forEach(({ name, group, bounds }) => {
+      pin(group, anchors.get(name));
+      // Hiding the entire group also removes its larger transparent touch target.
+      group.style.display = !selected && bounds.width / unit < 35 ? "" : "none";
+    });
+    if (selected) pin(marker, anchors.get(selected));
+    if (sample) pin(sampleMark, sample);
+    map.style.setProperty("--atlas-pixel", unit + "px");
+    if (keyboardRegion) focusTip(keyboardRegion);
+  }
+  const camera = createCamera(map, paintMarks);
+  frame.classList.add("atlas-map-ready");
+
+  function status(name) {
+    if (layer === "mar" && !coast.has(name))
+      return "Territorio del interior del Perú";
+    const theme =
+      { mar: "Mar", rios: "Ríos", lluvias: "Lluvias" }[layer] ?? layer;
+    if (!loaded) return theme + " · Consultando publicaciones…";
+    const number = counts.get(name) || 0;
+    if (!number) return theme + " · Sin publicaciones regionales en esta capa";
+    const breakdown = states?.get(name);
+    const upcomingCount = breakdown?.upcoming ?? upcoming?.get(name) ?? 0;
+    const parts = [];
+    if (breakdown?.active)
+      parts.push(
+        breakdown.active + (breakdown.active === 1 ? " vigente" : " vigentes"),
+      );
+    if (upcomingCount)
+      parts.push(
+        upcomingCount + (upcomingCount === 1 ? " próximo" : " próximos"),
+      );
+    if (breakdown?.recent)
+      parts.push(
+        breakdown.recent +
+          (breakdown.recent === 1 ? " reciente" : " recientes"),
+      );
+    const total = number + (number === 1 ? " reporte" : " reportes");
+    return (
+      theme +
+      " · " +
+      total +
+      (parts.length ? " (" + parts.join(", ") + ")" : "")
+    );
+  }
+  function paintTip(title, detail, x, y) {
+    if (tipTitle.textContent !== title) tipTitle.textContent = title;
+    if (tipInfo.textContent !== detail) tipInfo.textContent = detail;
+    tip.hidden = false;
+    const bounds = map.getBoundingClientRect(),
+      frameBox = frame.getBoundingClientRect();
+    const w = tip.offsetWidth,
+      h = tip.offsetHeight;
+    const anchorX = x - bounds.left,
+      anchorY = y - bounds.top;
+    const left = nearest(
+      anchorX + 15 + w < bounds.width ? anchorX + 15 : anchorX - w - 15,
+      6,
+      Math.max(6, bounds.width - w - 6),
+    );
+    const top = nearest(
+      anchorY >= h + 15 ? anchorY - h - 12 : anchorY + 18,
+      6,
+      Math.max(6, bounds.height - h - 6),
+    );
+    tip.style.transform =
+      "translate(" +
+      Math.round(left + bounds.left - frameBox.left) +
+      "px," +
+      Math.round(top + bounds.top - frameBox.top) +
+      "px)";
+  }
+  function hideTip() {
+    if (hover) {
+      regions.get(hover)?.classList.remove("atlas-hover");
+      hover = "";
+    }
+    tip.hidden = true;
+    activeTip = "";
+    sample = null;
+    sampleMark.setAttribute("visibility", "hidden");
+  }
+  function hoverRegion(name, x, y) {
+    if (hover !== name) {
+      hideTip();
+      hover = name;
+      regions.get(name).classList.add("atlas-hover");
+    }
+    activeTip = "region";
+    paintTip(regionLabel(name), status(name), x, y);
+  }
+  function inspect(event, touch = false) {
+    const name = event.target.closest("[data-region]")?.dataset.region;
+    if (name) return hoverRegion(name, event.clientX, event.clientY);
+    if (!grid || layer !== "mar" || !map.getScreenCTM()) return hideTip();
+    const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+      map.getScreenCTM().inverse(),
+    );
+    const cell = oceanCell(grid, p);
+    if (
+      !cell ||
+      [...$("landMask").children].some((path) => path.isPointInFill(p))
+    )
+      return hideTip();
+    if (activeTip !== "ocean") hideTip();
+    activeTip = "ocean";
+    sample = cell;
+    pin(sampleMark, cell);
+    sampleMark.setAttribute("visibility", "visible");
+    const title = temperature.format(cell.value) + " °C de anomalía";
+    const detail = "NOAA OISST · " + dateOfGrid.format(new Date(grid.time));
+    paintTip(title, detail, event.clientX, event.clientY);
+    if (touch) announce.textContent = title + ". " + detail;
+  }
+  function setTab(name) {
+    regions.get(tabRegion).setAttribute("tabindex", "-1");
+    tabRegion = name;
+    regions.get(tabRegion).setAttribute("tabindex", "0");
+  }
+  function select(name) {
+    if (name && !regions.has(name)) return;
+    if (name === selected) return;
+    hideTip();
+    if (selected) {
+      const previous = regions.get(selected);
+      previous.classList.remove("focused");
+      previous.setAttribute("aria-pressed", "false");
+    }
+    selected = name;
+    keyboardRegion = "";
+    frame.classList.toggle("atlas-region-open", Boolean(name));
+    updatePicker?.(name);
+    outline.setAttribute("visibility", name ? "visible" : "hidden");
+    marker.setAttribute("visibility", name ? "visible" : "hidden");
+    if (name) {
+      const path = regions.get(name);
+      setTab(name);
+      path.classList.add("focused");
+      path.setAttribute("aria-pressed", "true");
+      outline.setAttribute("d", path.getAttribute("d"));
+      markerText.textContent = regionLabel(name);
+      paintMarks(unit);
+      camera.fit(path.getBBox());
+      announce.textContent =
+        regionLabel(name) + ". " + status(name) + ". Ficha regional abierta.";
+    } else {
+      camera.home();
+      announce.textContent = "Vista nacional del Perú.";
+    }
+  }
+  $("zoomIn").onclick = () => {
+    hideTip();
+    camera.zoomBy(1.5);
   };
-  $("zoomIn").onclick = () => zoomBy(1.5);
-  $("zoomOut").onclick = () => zoomBy(1 / 1.5);
+  $("zoomOut").onclick = () => {
+    hideTip();
+    camera.zoomBy(1 / 1.5);
+  };
   $("resetView").onclick = () => {
-    zoom = 1;
-    center = null;
-    onRegion("");
-    redraw();
+    hideTip();
+    if (selected) onRegion("");
+    else camera.home();
   };
-  new ResizeObserver(redraw).observe(map);
-  redraw();
+  function focusTip(name) {
+    const pt = anchors.get(name).matrixTransform(map.getScreenCTM());
+    const b = map.getBoundingClientRect();
+    hoverRegion(
+      name,
+      nearest(pt.x, b.left + 12, b.right - 12),
+      nearest(pt.y, b.top + 12, b.bottom - 12),
+    );
+  }
+  map.addEventListener("focusin", (e) => {
+    const name = e.target.closest(".region-path")?.dataset.region;
+    if (name && e.target.matches(":focus-visible")) {
+      keyboardRegion = name;
+      camera.reveal(anchors.get(name));
+      focusTip(name);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (
+      e.key === "Escape" &&
+      !tip.hidden &&
+      !map.contains(document.activeElement)
+    )
+      hideTip();
+  });
+  map.addEventListener("focusout", () => {
+    keyboardRegion = "";
+    hideTip();
+  });
+  map.addEventListener("keydown", (e) => {
+    const name = e.target.closest(".region-path")?.dataset.region;
+    if (!name || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (
+      [
+        "ArrowRight",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowUp",
+        "Home",
+        "End",
+      ].includes(e.key)
+    ) {
+      e.preventDefault();
+      const next =
+        e.key === "Home"
+          ? names[0]
+          : e.key === "End"
+            ? names.at(-1)
+            : names[
+                (names.indexOf(name) +
+                  (["ArrowLeft", "ArrowUp"].includes(e.key) ? -1 : 1) +
+                  names.length) %
+                  names.length
+              ];
+      setTab(next);
+      regions.get(next).focus({ preventScroll: true });
+      return;
+    }
+    if (["Enter", " "].includes(e.key)) {
+      e.preventDefault();
+      onRegion(name);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      keyboardRegion = "";
+      hideTip();
+      if (selected) onRegion("");
+      else camera.home();
+    }
+  });
   map.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "touch" && zoom === 1) return;
-    const b = map.viewBox.baseVal;
+    if (!e.isPrimary || e.button !== 0) return;
+    keyboardRegion = "";
+    camera.stop();
+    const current = camera.snapshot();
     drag = {
+      id: e.pointerId,
       x: e.clientX,
       y: e.clientY,
-      c: [b.x + b.width / 2, b.y + b.height / 2],
-      w: b.width,
+      current,
       moved: false,
+      canPan: e.pointerType !== "touch" || current.z > 1.02,
     };
+    skipClick = false;
   });
   map.addEventListener("pointermove", (e) => {
-    if (!drag || !e.buttons) return;
-    const dx = e.clientX - drag.x,
-      dy = e.clientY - drag.y;
-    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-    drag.moved = true;
-    map.setPointerCapture(e.pointerId);
-    const scale = drag.w / map.clientWidth;
-    center = [drag.c[0] - dx * scale, drag.c[1] - dy * scale];
-    redraw();
-  });
-  const endDrag = () => {
-    if (drag?.moved) {
-      skipClick = true;
-      setTimeout(() => (skipClick = false), 120);
+    if (drag?.id === e.pointerId && e.buttons) {
+      const dx = e.clientX - drag.x,
+        dy = e.clientY - drag.y;
+      if (Math.hypot(dx, dy) <= 7 && !drag.moved) return;
+      drag.moved = true;
+      hideTip();
+      if (!drag.canPan) return;
+      map.classList.add("atlas-dragging");
+      if (!map.hasPointerCapture(e.pointerId))
+        map.setPointerCapture(e.pointerId);
+      const { x, y, scale } = drag.current;
+      camera.pan(x - dx * scale, y - dy * scale);
+    } else if (e.pointerType !== "touch") {
+      keyboardRegion = "";
+      inspect(e);
     }
+  });
+  function endDrag(e) {
+    if (drag?.id !== e.pointerId) return;
+    skipClick = drag.moved;
     drag = null;
-  };
+    map.classList.remove("atlas-dragging");
+  }
   map.addEventListener("pointerup", endDrag);
   map.addEventListener("pointercancel", endDrag);
-  map.addEventListener("click", (e) => {
-    const area = e.target.closest("[data-region]");
-    if (area && !skipClick) onRegion(area.getAttribute("data-region"));
+  map.addEventListener("pointerleave", (e) => {
+    if (e.pointerType !== "touch") hideTip();
+    if (drag && !drag.moved && !map.hasPointerCapture(e.pointerId)) endDrag(e);
   });
-  fetch("./atlas/oceano.json", opt)
-    .then((r) => {
-      if (!r.ok) throw Error("océano");
-      return r.json();
-    })
-    .then((data) => {
-      const heat = $("thermal"),
-        d = Math.abs(data.lons[1] - data.lons[0]);
-      for (const [key, value] of Object.entries({
-        x: data.lons[0] + 105 - d / 2,
-        y: 6 - data.lats[0] - d / 2,
-        width: data.lons.length * d,
-        height: data.lats.length * d,
-        href: thermalTexture(data),
-      }))
-        heat.setAttribute(key, value);
-      onOceanReady(data.time, OCEAN_SOURCE, data.product);
-    })
-    .catch(() => onOceanReady(null, OCEAN_SOURCE));
-  return {
-    regionNames: [...regions.keys()].sort((a, b) => a.localeCompare(b, "es")),
-    select(name) {
-      selected = name;
-      regions.forEach((p, n) => p.classList.toggle("focused", n === selected));
-    },
-    showLayer(layer, counts) {
-      $("thermal").style.display = layer === "mar" ? "" : "none";
-      regions.forEach((p, n) => {
-        let count = counts.get(n) || 0;
-        p.style.fill =
-          layer !== "mar" && count > 0
-            ? layer === "rios"
-              ? "#50d9c6a6"
-              : "#91b9f3ab"
-            : "transparent";
-        p.querySelector("title").textContent =
-          n +
-          (layer === "mar" ? "" : " · " + count + " publicaciones recientes");
+  map.addEventListener("click", (e) => {
+    if (skipClick) {
+      skipClick = false;
+      return;
+    }
+    const name = e.target.closest("[data-region]")?.dataset.region;
+    if (name) {
+      hideTip();
+      onRegion(name);
+    } else inspect(e, true);
+  });
+  let oceanRequest = null;
+  let oceanValidator = {};
+  let reportedEmptyGrid = false;
+  const sameAxisOrValues = (a, b) =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
+  async function updateOcean() {
+    try {
+      const response = await fetch("./atlas/oceano.json", {
+        ...opt,
+        cache: "no-cache",
+        headers: oceanValidator,
+        signal: AbortSignal.timeout(15000),
       });
+      if (response.status === 304 && grid) return false;
+      if (!response.ok) throw Error("Cuadrícula NOAA no disponible");
+      const next = await response.json();
+      if (!validOceanGrid(next)) throw Error("Cuadrícula NOAA incompleta");
+      const date = Date.parse(next.time);
+      const previousDate = grid ? Date.parse(grid.time) : null;
+      if (
+        grid &&
+        (date < previousDate ||
+          (date === previousDate &&
+            grid.product === "final" &&
+            next.product === "preliminary"))
+      )
+        return false;
+
+      const etag = response.headers.get("ETag");
+      const modified = response.headers.get("Last-Modified");
+      const validator = etag
+        ? { "If-None-Match": etag }
+        : modified
+          ? { "If-Modified-Since": modified }
+          : {};
+      const legendChanged =
+        !grid || date !== previousDate || next.product !== grid.product;
+      if (
+        !legendChanged &&
+        sameAxisOrValues(grid.lons, next.lons) &&
+        sameAxisOrValues(grid.lats, next.lats) &&
+        sameAxisOrValues(grid.values, next.values)
+      ) {
+        oceanValidator = validator;
+        return false;
+      }
+
+      // Prepare the whole replacement before touching the display so a bad
+      // response or rendering failure leaves the latest verified map intact.
+      const dx = next.lons[1] - next.lons[0],
+        dy = next.lats[0] - next.lats[1];
+      const replacement = {
+        x: next.lons[0] + 105 - dx / 2,
+        y: 6 - next.lats[0] - dy / 2,
+        width: next.lons.length * dx,
+        height: next.lats.length * dy,
+        href: thermalTexture(next),
+      };
+      for (const [key, value] of Object.entries(replacement))
+        $("thermal").setAttribute(key, value);
+      grid = next;
+      oceanValidator = validator;
+      if (activeTip === "ocean") hideTip();
+      if (legendChanged) onOceanReady(grid.time, OCEAN_SOURCE, grid.product);
+      return true;
+    } catch {
+      if (!grid && !reportedEmptyGrid) {
+        reportedEmptyGrid = true;
+        onOceanReady(null, OCEAN_SOURCE);
+      }
+      return false;
+    }
+  }
+  function refreshOcean() {
+    if (!oceanRequest)
+      oceanRequest = updateOcean().finally(() => {
+        oceanRequest = null;
+      });
+    return oceanRequest;
+  }
+  refreshOcean();
+  return {
+    refreshOcean,
+    regionNames: names,
+    select,
+    showLayer(nextLayer, nextCounts, options = {}) {
+      if (nextLayer !== layer) hideTip();
+      layer = nextLayer;
+      counts = nextCounts;
+      states = options.regionStatus ?? null;
+      upcoming = options.upcomingCounts ?? null;
+      loaded = options.loaded ?? true;
+      frame.dataset.mapLayer = layer;
+      $("thermal").style.display = layer === "mar" ? "" : "none";
+      regions.forEach((path, name) => {
+        const tinted =
+          (layer !== "mar" || coast.has(name)) && (counts.get(name) || 0) > 0;
+        const fills = {
+          mar: "#7ee6c844",
+          rios: "#50d9c6a6",
+          lluvias: "#91b9f3ab",
+        };
+        path.style.fill = tinted ? fills[layer] : "transparent";
+        path.setAttribute(
+          "aria-label",
+          regionLabel(name) + ". " + status(name),
+        );
+      });
+      if (hover) tipInfo.textContent = status(hover);
     },
   };
 }

@@ -5,6 +5,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {officialSources} from '../lib/oficiales.mjs';
 import {mediaSources} from '../lib/medios.mjs';
+import {pii} from '../lib/privacidad.mjs';
+import {isTemperatureSnapshot} from '../lib/temperatura.mjs';
 
 const registry = new Map([...officialSources, ...mediaSources].map(s => [s.id, s]));
 const issuerIds = new Set(officialSources.map(s => s.id));
@@ -16,13 +18,6 @@ const sensitiveText = [
   /\b(?:gh[pousr]_[a-zA-Z0-9]{25,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{20,})\b/,
   /\b(?:OPENAI_API_KEY|GITHUB_TOKEN|PRIVATE_KEY|ACCESS_TOKEN|API_SECRET|CLIENT_SECRET)\s*["']?\s*[:=]\s*["']?[^\s"';,{}]{10,}/i,
   /\bBearer\s+[a-z0-9_.-]{30,}/i,
-];
-const pii = [
-  ['posible correo de contacto', /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/i],
-  ['posible teléfono móvil', /(?<!\d)(?:\+?51[ .-]*)?9\d{2}[ .-]?\d{3}[ .-]?\d{3}(?!\d)/],
-  ['documento o identificador individual', /\b(?:d\.?\s*n\.?\s*i\.?|carn[eé] de extranjer[ií]a|pasaporte|n[uú]mero de (?:cuenta|suministro|cliente)|c[oó]digo de (?:cliente|abonado))\s*(?:n(?:[úu]mero|ro)?[.°º]*|[:#-])?\s*[a-z]?\s*[\d -]{5,15}\d\b/i],
-  ['posible DNI sin etiqueta', /(?<![\d.-])\b(?!(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\b)\d{8}\b(?![\d.-])/],
-  ['posible identificación de afectado', /\b(?:menor de edad|paciente|v[ií]ctima|damnificad[oa])\s+(?:fue\s+)?(?:identificad[oa]\s+como|de nombre|de iniciales)\s+\S+/iu],
 ];
 const privateField = /^(?:dni|pasaporte|telefono|celular|email|correo|direcciondomiciliaria|nombrepaciente|nombrevictima|nombresdelmenor|numerosuministro|cuentabancaria|apikey|accesstoken|clientsecret|claveprivada|privatekey|password|authorization)$/;
 const fold = v => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
@@ -58,7 +53,7 @@ function privateKeys(obj, where, issues) {
 }
 
 function checkSnapshot(p, files, issues, notes) {
-  if (!p || typeof p!=='object' || p.schemaVersion!==1 || !isTimestamp(p.updatedAt) || !Array.isArray(p.sources) || !p.sources.length || !Array.isArray(p.items)) {
+  if (!p || typeof p!=='object' || ![1,2].includes(p.schemaVersion) || !isTimestamp(p.updatedAt) || !Array.isArray(p.sources) || !p.sources.length || !Array.isArray(p.items)) {
     issues.push('panorama · estructura, fuentes o fecha de actualización inválidas'); return;
   }
   const asOf = Date.parse(p.updatedAt);
@@ -94,6 +89,12 @@ function checkSnapshot(p, files, issues, notes) {
       if (it[field]!=null && !isTimestamp(it[field])) issues.push(where+'.'+field+' · fecha inválida');
     }
     checkPrivacy(it,['title','summary','locality','region'],where,issues);
+    if(it.supersededBy && (!isText(it.supersededBy) || !publicUrl(it.supersededUrl,new URL(registry.get(it.sourceId).url).hostname))) issues.push(where+' · actualización sin referencia del emisor');
+    for (const u of it.coverageUrls ?? []) if (it.kind!=='oficial' || !publicUrl(u,new URL(registry.get(it.sourceId).url).hostname)) issues.push(where+' · visor territorial con origen inválido');
+    for (const part of it.coastalScope ?? []) {
+      checkPrivacy(part,['zone','stretch'],where,issues);
+      for (const line of part.conditions ?? []) checkPrivacy({line},['line'],where,issues);
+    }
   }
   for(const [id,s] of declared){
     if(s.status==='external') continue;
@@ -164,6 +165,10 @@ export async function verificarPublico(directory) {
       if(sensitiveText.some(rx=>rx.test(raw))) issues.push(display+' · posible credencial o clave privada (valor omitido)');
       if(relative==='data/panorama.json'){
         try{panorama=JSON.parse(data.toString('utf8'));}catch{issues.push('panorama · JSON inválido');}
+      }
+      if(relative==='data/temperatura.json'){
+        try{if(!isTemperatureSnapshot(JSON.parse(data.toString('utf8')))) issues.push('temperatura · serie semanal inválida');}
+        catch{issues.push('temperatura · JSON inválido');}
       }
       if(/\.html$/i.test(name))pages.push([data.toString('utf8'),display]);
     }

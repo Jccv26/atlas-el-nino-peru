@@ -6,9 +6,14 @@
     <meta name="theme-color" content="#0c1c24" />
     <meta
       name="description"
-      content="Explora El Niño en el Perú con mapas, avisos oficiales, fuentes regionales y un comparador histórico."
+      content="Consulta El Niño hoy en el Perú. Toca una región del mapa para ver sus avisos, su vigencia y la fuente original."
     />
-    <title>Atlas de El Niño · Perú al Día</title>
+    <title>Perú al Día · El Niño hoy</title>
+    <meta property="og:title" content="Perú al Día · El Niño hoy" />
+    <meta
+      property="og:description"
+      content="Explora el mapa del Perú y consulta los avisos de tu región."
+    />
     <link rel="icon" href="./atlas/marca.svg" type="image/svg+xml" />
     <link
       rel="preload"
@@ -17,19 +22,20 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="./atlas.css" />
+    <link rel="stylesheet" href="./atlas.css?v=2" />
+    <link rel="stylesheet" href="./mapa-interaccion.css?v=2" />
   </head>
   <body>
     <a class="skip" href="#avisos">Saltar a los avisos</a>
     <header class="mast">
       <a class="brand" href="#inicio" aria-label="Perú al Día, inicio"
         ><img src="./atlas/marca.svg" width="37" height="37" alt="" /><span
-          >Perú al Día<small>Atlas de El Niño</small></span
+          >Perú al Día<small>El Niño hoy</small></span
         ></a
       >
       <nav aria-label="Navegación principal">
-        <a class="active" href="#inicio">Mapa</a
-        ><a href="./historia.html">Historia</a><a href="#avisos">Avisos</a
+        <a class="active" aria-current="location" href="#inicio">Mapa</a
+        ><a href="#avisos">Avisos</a
         ><a class="nav-source" href="#fuentes">Fuentes</a>
       </nav>
       <form id="searchForm" class="search" role="search">
@@ -41,6 +47,7 @@
           id="searchInput"
           placeholder="Buscar región, río o lugar"
           aria-label="Buscar región, río o lugar"
+          maxlength="100"
           list="places"
         /><datalist id="places"></datalist
         ><button type="submit" aria-label="Buscar">↵</button>
@@ -111,9 +118,12 @@
             </g>
           </svg>
           <div class="map-head">
-            <span class="pill map-scope"
-              ><span class="scope-icon">◎</span> Perú · Pacífico oriental</span
-            >
+            <label class="pill map-scope">
+              <span class="scope-icon" aria-hidden="true">◎</span>
+              <select id="mapRegion" aria-label="Explorar una región del mapa">
+                <option value="">Explorar una región</option>
+              </select>
+            </label>
             <div class="layer-switch" role="group" aria-label="Capas del mapa">
               <button class="selected" data-layer="mar" aria-pressed="true">
                 Mar</button
@@ -123,7 +133,7 @@
           </div>
           <div class="climate-card" id="climateCard">
             <div class="card-top">
-              <span class="eyebrow">Estado del fenómeno</span
+              <span class="eyebrow">Pronóstico de ENFEN</span
               ><span class="card-icon" aria-hidden="true">≈</span>
             </div>
             <h1>El Niño costero</h1>
@@ -139,7 +149,7 @@
               id="climateLink"
               target="_blank"
               rel="noopener"
-              href="https://enfen.imarpe.gob.pe/download/comunicado-oficial-enfen-n-20-2026/"
+              href="https://repositorio.imarpe.gob.pe/items/d3746777-ec3a-466e-8d2c-3e4b9a4146e8"
               ><span id="climateSource">ENFEN · 13 nov 2026</span
               ><span aria-hidden="true">↗</span></a
             >
@@ -150,6 +160,15 @@
             <div class="scales" id="scales">
               <span>−4</span><span>0</span><span>+4</span><span>+8</span>
             </div>
+            <button
+              type="button"
+              id="coverageText"
+              class="coverage-text"
+              aria-haspopup="dialog"
+              disabled
+            >
+              Consultando cobertura…
+            </button>
             <button class="legend-source" id="mapDetails">
               Acerca de esta capa <span>ⓘ</span>
             </button>
@@ -161,6 +180,9 @@
               ⌖
             </button>
           </div>
+          <div id="mapHint" class="map-hint">
+            Selecciona una región para ver sus avisos
+          </div>
           <div id="regionCard" class="region-card" hidden>
             <button
               id="closeRegion"
@@ -168,44 +190,54 @@
               aria-label="Cerrar ficha regional"
             >
               ×</button
-            ><span class="eyebrow">Territorio seleccionado</span>
+            ><span class="eyebrow">Tu región</span>
             <h2 id="regionTitle"></h2>
             <p id="regionCount"></p>
-            <a href="#avisos" class="text-btn"
-              >Consultar publicaciones <span>↓</span></a
+            <p id="regionPreviewLabel" class="preview-label" hidden>
+              Otros avisos oficiales de esta región
+            </p>
+            <div id="regionPreview" class="region-preview"></div>
+            <a href="#avisos" class="text-btn" id="regionGo"
+              >Ver avisos de la región <span aria-hidden="true">↓</span></a
+            >
+            <a href="#avisos" id="otherRegion" class="all-region" hidden
+              >Todos los temas de la región ↓</a
             >
           </div>
         </div>
-        <div class="history-dock">
-          <div class="history-name">
-            <span class="section-icon">◷</span><b>Comparar episodios</b>
-          </div>
-          <div
-            class="years"
-            role="group"
-            aria-label="Elegir episodio histórico"
-          >
-            <button data-year="1983">1982–83</button
-            ><button data-year="1998">1997–98</button
-            ><button data-year="2017">2017</button
-            ><button data-year="2026" class="chosen">2026</button>
-          </div>
-          <a href="./historia.html" class="compare-link"
-            >Abrir comparador <span>→</span></a
-          >
+      </section>
+      <section
+        class="ocean-record"
+        aria-labelledby="recordHeading"
+        id="temperatura"
+      >
+        <div class="ocean-reading">
+          <span class="eyebrow">Niño 1+2 · NOAA</span>
+          <strong id="recordValue">+5,7 <small>°C</small></strong>
         </div>
+        <div class="ocean-copy">
+          <h2 id="recordHeading">Récord semanal frente a Perú y Ecuador</h2>
+          <p id="recordDescription">
+            En la semana centrada en el 18 de noviembre de 2026, la región Niño
+            1+2 alcanzó su mayor anomalía de temperatura en la serie de NOAA,
+            iniciada en 1981.
+          </p>
+        </div>
+        <button id="recordDetails" class="record-button">
+          Cómo se mide <span aria-hidden="true">↗</span>
+        </button>
       </section>
       <section id="avisos" class="publications">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Consulta nacional</p>
-            <h2>Avisos y reportes</h2>
+            <p class="eyebrow" id="feedScope">Todo el Perú</p>
+            <h2 id="feedHeading">Avisos y reportes</h2>
             <p id="snapshotTime" class="subtle" aria-live="polite">
               Consultando las fuentes…
             </p>
           </div>
           <button id="listen" class="outline-btn" disabled>
-            <span aria-hidden="true">▷</span> Escuchar resumen
+            <span aria-hidden="true">▷</span> Boletín nacional
           </button>
         </div>
         <div class="controls">
@@ -217,7 +249,7 @@
             <button class="selected" data-feed="oficial" aria-pressed="true">
               Oficiales</button
             ><button data-feed="prensa" aria-pressed="false">
-              Desde las regiones</button
+              Medios y videos</button
             ><button data-feed="todos" aria-pressed="false">Todo</button>
           </div>
           <div class="filters">
@@ -230,12 +262,25 @@
               <option value="mar">Mar y El Niño</option>
               <option value="agua">Agua potable</option>
             </select>
+            <select id="period" aria-label="Filtrar por vigencia">
+              <option value="">Cualquier vigencia</option>
+              <option value="vigente">Vigentes</option>
+              <option value="proximo">Próximos</option>
+              <option value="finalizado">Finalizados</option>
+              <option value="actualizado">Sustituidos</option>
+              <option value="publicado">Sin vigencia definida</option>
+            </select>
           </div>
         </div>
         <div id="queryState" hidden>
           <span></span><button type="button">Quitar búsqueda ×</button>
         </div>
-        <div id="listCount" class="list-count" aria-live="polite"></div>
+        <div class="list-bar">
+          <div id="listCount" class="list-count" aria-live="polite"></div>
+          <button id="clearFilters" type="button" hidden>
+            Limpiar filtros ×
+          </button>
+        </div>
         <div id="items" class="items"></div>
         <button id="more" class="outline-btn" hidden>
           Ver más publicaciones
@@ -251,7 +296,7 @@
           </summary>
           <p class="subtle">
             Cada entidad publica a su propio ritmo. Una consulta reciente puede
-            devolver un documento anterior; revisa la vigencia en el original.
+            devolver un documento anterior. Revisa la vigencia en el original.
           </p>
           <div id="sourceList" class="source-list"></div>
           <h3>Cartografía</h3>
@@ -296,10 +341,10 @@
       </section>
     </main>
     <footer>
-      <span>Perú al Día <i> / </i> Atlas de El Niño</span
-      ><span>Iniciativa ciudadana · Piloto</span>
+      <span><b>Perú al Día</b> <i> / </i> El Niño hoy</span>
+      <span>Iniciativa ciudadana</span><a href="#inicio">Volver al mapa ↑</a>
     </footer>
-    <dialog id="infoDialog">
+    <dialog id="infoDialog" aria-labelledby="dialogTitle">
       <div class="dialog-header">
         <span class="eyebrow" id="dialogKind"></span
         ><button class="close" id="closeDialog" aria-label="Cerrar">×</button>
@@ -307,6 +352,6 @@
       <h2 id="dialogTitle"></h2>
       <div id="dialogBody"></div>
     </dialog>
-    <script src="./atlas-app.mjs" type="module"></script>
+    <script src="./atlas-app.mjs?v=2" type="module"></script>
   </body>
 </html>

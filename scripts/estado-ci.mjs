@@ -2,18 +2,20 @@
 // never executed. Only a verified allowlist of regular files is restored.
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, writeFile, copyFile, readdir, stat, utimes, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, copyFile, readdir, stat, utimes, rm, rename } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { fetchOcean } from '../public/atlas/oceano.mjs';
+import { fetchTemperature, isTemperatureSnapshot } from '../lib/temperatura.mjs';
 import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
 const dayMs = 86400000;
 const ledgerName = '.atlas-reservas.v1';
 const metaName = 'edicion.json';
-const baseFiles = ['public/data/panorama.json', 'public/atlas/oceano.json'];
+const temperatureFile = 'public/data/temperatura.json';
+const baseFiles = ['public/data/panorama.json', 'public/atlas/oceano.json', temperatureFile];
 const audioName = /^boletin-(\d{4}-\d{2}-\d{2})-(07|13|19)\.(?:wav|mp3)$/;
 const relativeState =
   /^boletines\/(\d{4}-\d{2}-\d{2})-(07|13|19)\/(?:(?:text|fuentes)\.json|(?:texto|voz)-[12]\.reserved)$/;
@@ -56,6 +58,13 @@ async function optionalFile(file) {
     if (e.code === 'ENOENT') return null;
     throw e;
   }
+}
+function savedTemperature(data) {
+  if (!data) return null;
+  try {
+    const report = JSON.parse(data);
+    return isTemperatureSnapshot(report) ? report : null;
+  } catch { return null; }
 }
 async function copy(from, to) {
   await mkdir(dirname(to), { recursive: true });
@@ -185,8 +194,10 @@ async function mirrorPublic(root, cache, now, restore) {
   const source = restore ? cache : root,
     target = restore ? root : cache;
   for (const relative of baseFiles) {
-    if (await optionalFile(join(source, relative)))
-      await copy(join(source, relative), join(target, relative));
+    const data = await optionalFile(join(source, relative));
+    if (!data) continue;
+    if (relative === temperatureFile && !savedTemperature(data)) continue;
+    await copy(join(source, relative), join(target, relative));
   }
   const folder = 'public/media';
   await mkdir(join(target, folder), { recursive: true });
@@ -230,6 +241,7 @@ export async function publishCycle({
   refresh,
   generate = generateBulletin,
   ocean = fetchOcean,
+  temperature = fetchTemperature,
   verify = verifyPublic,
   apiEnabled = apiCreditActive(now),
 }) {
@@ -282,9 +294,27 @@ export async function publishCycle({
 
     if (!refresh) {
       const { actualizar } = await import('./actualizar.mjs');
-      refresh = () => actualizar({ ai: false });
+      refresh = () => actualizar({ ai: false, bulletin: false });
     }
     const snapshot = await refresh();
+    const temperaturePath = join(root, temperatureFile);
+    try {
+      const stored = await optionalFile(temperaturePath);
+      const previous = savedTemperature(stored);
+      const lastCheck = Date.parse(previous?.checkedAt);
+      if (!Number.isFinite(lastCheck) || lastCheck > now || limaDay(lastCheck) !== limaDay(now)) {
+        const report = await temperature({ now });
+        if (!isTemperatureSnapshot(report) || (previous?.seriesEnd && previous.seriesEnd > report.seriesEnd))
+          throw new Error('Retroceso en la última semana de NOAA');
+        const staged = temperaturePath + '.tmp';
+        try {
+          await writeFile(staged, JSON.stringify(report));
+          await rename(staged, temperaturePath);
+        } finally { await rm(staged, {force:true}); }
+      }
+    } catch {
+      console.warn('No se actualizó la serie semanal Niño 1+2. Se conserva el último registro válido.');
+    }
     let savedOceanDay = meta.oceanDay;
     if (meta.oceanDay !== limaDay(now)) {
       try {
