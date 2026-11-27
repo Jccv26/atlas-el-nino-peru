@@ -1,7 +1,11 @@
 import {mostrarHistoria} from "./historia-comparada.mjs";
-import {explorer} from "./explorar.mjs?v=8";
+import {explorer} from "./explorar.mjs?v=9";
 import {applyVerifiedPressLocations} from "./ubicacion-prensa.mjs";
 import {initialLayer,combinedLabels,regionalOverview} from "./capa-todo.mjs?v=2";
+import {hydrologyIndexUrl} from "./avisos-hidrologicos-api.mjs";
+import {riverReader,withRiverReading} from "./consulta-rios.mjs";
+import {weatherIndexUrl} from "./avisos-meteorologicos-api.mjs";
+import {meteorologicalReader,withMeteorologicalReading} from "./consulta-meteo.mjs";
 import {isRiverNotice,stationReading,riverValidity} from "./estacion-hidrologica.mjs";
 import {signalDates} from "./resumen-territorial.mjs?v=2";
 import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs?v=3";
@@ -111,6 +115,52 @@ let panel = null,
   editionReadFailed = false,
   audio = null,
   speaking = false;
+let nationalEdition=null, lastProjection=null;
+let browserStorage;
+try{browserStorage=window.localStorage;}catch{}
+const rivers=riverReader({storage:browserStorage}), weather=meteorologicalReader({storage:browserStorage});
+const observing=new Set();
+const readsRivers=()=>mode==="ahora" && ["todo","rios"].includes(layer);
+const readsWeather=()=>["todo","lluvias"].includes(layer);
+function selectEdition() {
+  if(!nationalEdition)return;
+  const now=Date.now();
+  const riverSample=readsRivers() && now-Date.parse(rivers.sample?.checkedAt)<=7*86400000 ? rivers.sample : null;
+  const weatherSample=readsWeather() && now-Date.parse(weather.sample?.checkedAt)<=86400000 ? weather.sample : null;
+  if(lastProjection?.national===nationalEdition && lastProjection.rivers===riverSample && lastProjection.weather===weatherSample)return;
+  const withRivers=withRiverReading(nationalEdition,riverSample);
+  panel=withMeteorologicalReading(withRivers,weatherSample);
+  mappedItems=layerRecords(panel.items);
+  lastProjection={national:nationalEdition,rivers:riverSample,weather:weatherSample};
+}
+function sourceTimes(edition=panel) {
+  return [[readsRivers(),"Ríos",edition?.directRiverCheckedAt,rivers],[readsWeather(),"Avisos meteorológicos",edition?.directMeteoCheckedAt,weather]]
+    .flatMap(([enabled,label,checked,reader])=>{
+      if(!enabled)return [];
+      if(checked)return [label+" · última consulta directa a SENAMHI el "+dateTime(checked)+(reader.failed?" (pendiente de reconexión)":"")];
+      return reader.failed ? [label+" · consulta directa pendiente. Se muestra la edición publicada."] : [];
+    });
+}
+function syncDirectSources() {
+  if(!nationalEdition)return;
+  selectEdition();
+  const text=sourceTimes().join(" · ");
+  const status=$("directSourceTimes");
+  if(status.textContent!==text)status.textContent=text;
+  status.hidden=!text;
+  if(document.hidden || navigator.onLine===false)return;
+  const readers=[...(readsRivers()?[rivers]:[]),...(readsWeather()?[weather]:[])];
+  for(const reader of readers) {
+    const promise=reader.refresh(nationalEdition);
+    if(!promise || observing.has(promise))continue;
+    observing.add(promise);
+    const finish=()=>{
+      observing.delete(promise);
+      syncLayer();renderItems();refreshOpenOfficial();
+    };
+    promise.then(finish,finish);
+  }
+}
 const dateOptions={timeZone:"America/Lima", day:"2-digit",month:"short",year:"numeric"};
 const limaDay=new Intl.DateTimeFormat("es-PE",dateOptions);
 const limaTime=new Intl.DateTimeFormat("es-PE",{...dateOptions,hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
@@ -148,15 +198,28 @@ function link(text, url) {
   return a;
 }
 let dialogRequest = 0;
+let openOfficial=null;
+function refreshOpenOfficial() {
+  if(!openOfficial || !$("infoDialog").open)return;
+  const current=panel?.items.find(row=>row.id===openOfficial.id && row.url===openOfficial.url);
+  if(!current || ["supersededBy","withdrawnAt","directRiverCheckedAt","directMeteoCheckedAt"].every(key=>current[key]===openOfficial[key]))return;
+  const scoped=region && noticeForRegionDay(current,region,Date.now(),ubigeo,catalog);
+  showRecord(scoped || current,true);
+}
 function dialog(kind, title, ...content) {
   dialogRequest++;
+  openOfficial=null;
   $("dialogKind").textContent = kind;
   $("dialogTitle").textContent = title;
   $("dialogBody").replaceChildren(...content);
   if (!$("infoDialog").open) $("infoDialog").showModal();
 }
 async function recordDialog(record, fromLink, ...content) {
-  if (fromLink) return dialog(...content);
+  function display() {
+    dialog(...content);
+    if(record.sourceId==="senamhi-rios" || record.sourceId==="senamhi-meteo")openOfficial=record;
+  }
+  if (fromLink) return display();
   const request = ++dialogRequest;
   const before = location.href;
   const token = await avisoKey(record).catch(() => "");
@@ -168,7 +231,7 @@ async function recordDialog(record, fromLink, ...content) {
     $("infoDialog").dataset.sharedNotice = token;
     openedNotice = token;
   }
-  dialog(...content);
+  display();
 }
 let leavingNotice = false;
 function dismissDialog() {
@@ -357,7 +420,7 @@ function explanationCredit(note) {
     : "Explicación con IA";
 }
 function explanationFor(item) {
-  const note = panel?.explanations?.notices?.[item.id];
+  const note = (item.directRiverCheckedAt || item.directMeteoCheckedAt) ? null : panel?.explanations?.notices?.[item.id];
   if (note?.what && note.meaning && ["ia", "fuentes"].includes(note.mode) && (!isRiverNotice(item) || stationReading(item)))
     return note;
   let what = simpleTitle(item.phenomenon || item.title);
@@ -443,7 +506,7 @@ function placePayload() {
     ? [records.length+(records.length===1?" reporte en esta vista.":" reportes en esta vista."), example].join(" ")
     : mode==="pronostico"?"Sin pronóstico publicado con este alcance en la edición consultada.":"Sin reporte reciente para este lugar en la edición consultada.";
   return sharePayload({...shareLocation(),place,title:place+" · "+layerNames[layer]+" · "+heading,
-    situation:panel?situation:"Consulta la edición disponible en el mapa.",source:"Perú al Día · edición",at:panel?.updatedAt});
+    situation:panel?[situation,...sourceTimes().filter(t=>t.includes("última consulta"))].join(" "):"Consulta la edición disponible en el mapa.",source:"Perú al Día · edición nacional",at:panel?.updatedAt});
 }
 function noticeShare(record) {
   const container=node("div");
@@ -489,6 +552,11 @@ async function openSharedNotice() {
   let found;
   try {
     found=await resolveAviso(token,{items:panel.items,signals:localExplorer.signals,originals:panel.sharedOriginals});
+    if(["missing","archived"].includes(found.kind) && observing.size) {
+      await Promise.allSettled([...observing]);
+      selectEdition();
+      found=await resolveAviso(token,{items:panel.items,signals:localExplorer.signals,originals:panel.sharedOriginals});
+    }
   } catch {found={kind:"missing"};}
   if(openedNotice!==token || new URLSearchParams(location.search).get("aviso")!==token)return;
   $("infoDialog").dataset.sharedNotice=token;
@@ -515,6 +583,7 @@ function showRecord(item, fromLink=false) {
   const references=recordSources(node,link);
   references.add("Publicación original de "+source+" ↗", item.url);
   const fields = [];
+  const direct=item.directRiverCheckedAt || item.directMeteoCheckedAt;
   let explained = "";
   if (
     item.kind === "oficial" &&
@@ -536,6 +605,11 @@ function showRecord(item, fromLink=false) {
   if (item.summary && ![item.title,explained].some(t=>fold(t)===fold(item.summary)))
     fields.push(node("p",item.summary,explained?"":"record-lead"));
   fields.push(node("p",source,"record-source"),noticeShare(item));
+  if(direct) {
+    fields.push(node("p","Consulta directa a SENAMHI · "+dateTime(direct)+" (hora de Perú)."));
+    if(item.directRiverCheckedAt)references.add("Índice de avisos hidrológicos consultado ↗",hydrologyIndexUrl);
+    if(item.directMeteoCheckedAt)references.add("Índice de avisos meteorológicos consultado ↗",weatherIndexUrl);
+  }
   if(item.validUntil || item.withdrawnAt || item.supersededBy)
     fields.push(node("p","Estado del aviso · "+periodNames[validity(item)]));
   fields.push(...recordDates([
@@ -988,6 +1062,7 @@ function renderRegionCard() {
   }
 }
 function syncLayer() {
+  syncDirectSources();
   const counts = new Map(),
     regionTotals = new Map(),
     regionStatus = new Map();
@@ -1684,6 +1759,7 @@ function renderSources() {
       }
       if (s.nowcasting?.observedAt)
         d.append(node("small", "Fecha de la observación en el visor · " + dateTime(s.nowcasting.observedAt)));
+      if (s.readChannel==="servicios")d.append(node("small","Consulta de la edición nacional a la API de avisos de SENAMHI."));
       if (s.readChannel === "phisis" || s.readChannel === "web+phisis") {
         d.append(
           node(
@@ -1831,8 +1907,8 @@ function updateClimate() {
   $("climateLink").href = safeUrl(fresh.url) || enfenUrl;
 }
 function audioText() {
-  if (panel?.bulletin?.text) return panel.bulletin.text;
-  const take = (panel?.items || [])
+  if (nationalEdition?.bulletin?.text) return nationalEdition.bulletin.text;
+  const take = (nationalEdition?.items || [])
     .filter((i) => i.kind === "oficial")
     .slice(0, 3);
   return take.length
@@ -1982,8 +2058,8 @@ async function readEdition(forceCheck) {
       if(panel && Date.parse(data.updatedAt)<Date.parse(panel.updatedAt)) continue;
       editionReadFailed=false;
       applyVerifiedPressLocations(data);
-      mappedItems = layerRecords(data.items);
-      panel = data;
+      nationalEdition=data;
+      selectEdition();
       showEditionTime();
       updateClimate();
       renderSources();

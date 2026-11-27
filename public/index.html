@@ -83,7 +83,7 @@
     <main>
       <section id="inicio" aria-label="Mapa interactivo del Perú">
         <div class="situation-header">
-          <div><h1>Situación en el Perú</h1><p id="editionLine" role="status">Consultando la última edición…</p></div>
+          <div><h1>Situación en el Perú</h1><p id="editionLine" role="status">Consultando la última edición…</p><p id="directSourceTimes" class="source-freshness" role="status" hidden></p></div>
           <div class="view-switch" role="group" aria-label="Momento del mapa">
             <button data-view="ahora" aria-pressed="true">Último corte</button>
             <button data-view="pronostico" aria-pressed="false">Pronóstico</button>
@@ -450,7 +450,7 @@
       <div id="dialogBody"></div>
     </dialog>
     <script type="module">
-      if (location.protocol !== "file:") import("./atlas-app.mjs?v=19");
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=20");
     </script>
   </body>
 </html>

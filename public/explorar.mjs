@@ -106,7 +106,11 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     briefPanel=panel;briefIndex=index;briefKey=key;
     const place=city || (area==="1501" ? "Lima Metropolitana" : index?.byId.get(area)?.name) || regionTitle(region);
     $("areaBriefTitle").textContent=(area?.length===4 && area!=="1501" ? "Resumen de la provincia de " : "Resumen de ")+place;
-    $("areaBriefCut").textContent=panel?.updatedAt ? "Corte del "+dateTime(panel.updatedAt)+" · hora de Perú" : "";
+    const clocks=[];
+    if(panel?.updatedAt)clocks.push("Edición nacional del "+dateTime(panel.updatedAt));
+    if(records.some(s=>s.item?.directRiverCheckedAt))clocks.push("Ríos consultados directamente el "+dateTime(panel.directRiverCheckedAt));
+    if(records.some(s=>s.item?.directMeteoCheckedAt))clocks.push("Avisos meteorológicos consultados directamente el "+dateTime(panel.directMeteoCheckedAt));
+    $("areaBriefCut").textContent=clocks.length ? clocks.join(" · ")+" · hora de Perú" : "";
     const facts=$("areaBriefFacts"),visual=$("areaBriefVisual");
     facts.replaceChildren();visual.replaceChildren();
     const brief=territorialBrief(records,{region,area,index});
@@ -276,7 +280,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     $("signalsCount").textContent=current.length?String(current.length):"";
     const viewKey=[region,area,city,view,layer,hazard].join("|");
     const canSwitch=view==="ahora" && recent.some(s=>s.mode==="pronostico" && matchesLayer(s));
-    const listKey=JSON.stringify([viewKey,Boolean(panel),canSwitch,current.map(s=>[s.id,s.title,s.label,s.at])]);
+    const listKey=JSON.stringify([viewKey,Boolean(panel),canSwitch,current.map(s=>[s.id,s.title,s.label,s.at,s.expiresAt,s.item?.directRiverCheckedAt,s.item?.directMeteoCheckedAt])]);
     if(listKey!==lastResults) {
       lastResults=listKey;
       const list=$("localSignals");list.replaceChildren();
