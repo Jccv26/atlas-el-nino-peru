@@ -379,6 +379,12 @@
   line-height: 1.4;
   color: #b8cbc8;
 }
+.region-more > summary {
+  padding: 8px 0;
+  cursor: pointer;
+  color: #a2e8d9;
+  font-size: 12px;
+}
 .status-listado {
   color: #adf1d4;
 }

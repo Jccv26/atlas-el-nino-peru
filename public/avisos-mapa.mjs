@@ -94,9 +94,14 @@ function regionsOf(item) {
 }
 function mergeGroup(members) {
   const original = members.find((m) => m.sourceId !== "coen");
-  const primary =
+  let primary =
     original ?? members.find((m) => !m.rosterListedAt && regionsOf(m).length) ?? members.find((m) => regionsOf(m).length) ?? members[0];
   if (members.length === 1) return primary;
+  const roster = members.filter((m) => m.rosterListedAt).sort((a,b)=>b.rosterListedAt.localeCompare(a.rosterListedAt))[0];
+  const endAt = (m) => Date.parse(m.validUntil?.length===10 ? m.validUntil+"T23:59:59-05:00" : m.validUntil);
+  // A later national roster can explicitly show the same station notice
+  // after the previously published individual copy's expiry.
+  if (roster && endAt(primary)<Date.parse(roster.rosterListedAt)) primary=roster;
   const sources = [primary, ...members.filter((m) => m !== primary)];
   const regions = new Map(),
     levels = {},
@@ -150,7 +155,7 @@ function mergeGroup(members) {
   if (Object.keys(levels).length) result.regionLevels = levels;
   if (Object.keys(provinces).length) result.provincesByRegion = provinces;
   if (!primary.validFrom && !primary.validUntil) {
-    const dated = sources.find((m) => m.validFrom && m.validUntil);
+    const dated = sources.find((m) => m.validFrom && m.validUntil && !(primary.rosterListedAt && endAt(m)<Date.parse(primary.rosterListedAt)));
     if (dated)
       Object.assign(result, {
         validFrom: dated.validFrom,

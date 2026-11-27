@@ -293,6 +293,12 @@ function simpleTitle(title) {
     ? words[0]?.toUpperCase() + words.slice(1).toLocaleLowerCase("es-PE")
     : words;
 }
+function explanationCredit(note) {
+  if (note.mode !== "ia") return "Según la fuente";
+  return note.method === "seleccion"
+    ? "Explicación seleccionada con IA"
+    : "Explicación con IA";
+}
 function explanationFor(item) {
   const note = panel?.explanations?.notices?.[item.id];
   if (note?.what && note.meaning && ["ia", "fuentes"].includes(note.mode))
@@ -368,7 +374,7 @@ function showRecord(item) {
       node(
         "small",
         note.mode === "ia"
-          ? "Explicación con IA basada en esta publicación."
+          ? explanationCredit(note) + " basada en esta publicación."
           : "Lectura de la publicación oficial.",
       ),
     );
@@ -671,11 +677,7 @@ function regionStory(item, scope) {
     "Ver ficha y fuente de " + source + ". " + item.title,
   );
   button.onclick = () => showRecord(item);
-  const credit = node(
-    "small",
-    note.mode === "ia" ? "Explicación con IA" : "Según la fuente",
-    "story-credit",
-  );
+  const credit = node("small", explanationCredit(note), "story-credit");
   story.append(button, credit);
   return story;
 }
@@ -751,13 +753,30 @@ function renderRegionCard() {
           "brief-empty",
         ),
       );
-    for (const item of [first, second].filter(Boolean)) {
+    const primary = [first, second].filter(Boolean);
+    const third =
+      general &&
+      ranked.find((item) =>
+        primary.every((shown) => storyType(item) !== storyType(shown)),
+      );
+    for (const item of [...primary, third].filter(Boolean)) {
       const scope = selectedCity
         ? direct.includes(item)
           ? "En " + selectedCity
           : "En la región " + regionLabel(region)
         : "";
-      preview.append(regionStory(item, scope));
+      const story = regionStory(item, scope);
+      if (item === third) {
+        const details = node("details", "", "region-more");
+        details.append(
+          node(
+            "summary",
+            "También en " + regionLabel(region) + " · " + storyType(item),
+          ),
+          story,
+        );
+        preview.append(details);
+      } else preview.append(story);
     }
     if (!first)
       preview.append(
