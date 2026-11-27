@@ -72,6 +72,13 @@ test('una corrección o el retiro oficial del aviso invalidan el detalle antiguo
   assert.ok(!mergePanorama(seed,published,now).radar.reports.some(r=>r.id===seedReport.id));
 });
 
+test('una publicación incompleta o de fecha futura no sustituye la edición verificada',()=>{
+  const {seed,published}=dataPair();
+  for(const broken of [null, {}, {...published,items:null},{...published,updatedAt:iso(now+1000)}]) {
+    assert.equal(mergePanorama(seed,broken,now),seed);
+  }
+});
+
 test('la restauración coteja el intervalo de un polígono y conserva el histórico semanal',async()=>{
   const {seed,published}=dataPair();const tmp=await mkdtemp(join(tmpdir(),'perualdia-restaurar-'));
   try{

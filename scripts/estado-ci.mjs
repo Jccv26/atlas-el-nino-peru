@@ -301,13 +301,13 @@ function combineDetail(record,other) {
 // Choose observations by their successful read, and independently retain the
 // newest actual attempt (which may have failed after that read on another host).
 export function mergePanorama(seed, published, now = Date.now()) {
-  if (!seed || ![1,2].includes(seed.schemaVersion) || ![1,2].includes(published?.schemaVersion) ||
-      !Array.isArray(seed.sources) || !Array.isArray(seed.items) ||
-      !Array.isArray(published.sources) || !Array.isArray(published.items)) return published;
+  const usable=edition=>[1,2].includes(edition?.schemaVersion) && Array.isArray(edition.sources) &&
+    Array.isArray(edition.items) && timestamp(edition.updatedAt)>0 && timestamp(edition.updatedAt)<=now;
+  if (!usable(seed)) return published;
+  if (!usable(published)) return seed;
   const sources = new Map(published.sources.map(s => [s.id,s]));
   const replacements = new Map();
   let checkedThrough = Date.parse(published.updatedAt);
-  if (!Number.isFinite(checkedThrough)) return published;
   let schemaVersion = published.schemaVersion;
   for (const s of seed.sources) {
     const success = Date.parse(s.lastSuccessAt), checked = Date.parse(s.checkedAt);
@@ -358,7 +358,9 @@ export async function mirrorPublic(root, cache, now, restore, seed = null) {
     const data = await optionalFile(join(source, relative));
     if (!data) continue;
     if (restore && seed && relative === baseFiles[0]) {
-      panorama=mergePanorama(seed,JSON.parse(data),now);
+      let edition;
+      try {edition=JSON.parse(data);} catch { /* Keep the verified edition from main. */ }
+      panorama=mergePanorama(seed,edition,now);
       await writeFile(join(target,relative),JSON.stringify(panorama));
       continue;
     }
