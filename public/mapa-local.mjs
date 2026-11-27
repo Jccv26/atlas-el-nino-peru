@@ -69,7 +69,9 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
   world.append(pins);
   const cache=new Map();
   function json(path,volatile=false) {
-    if (!cache.has(path)) cache.set(path,fetch(volatile?editionAsset(path):path,volatile?{cache:"no-cache"}:{}).then(r=>{
+    if (!cache.has(path)) cache.set(path,fetch(volatile?editionAsset(path):path,{
+      cache:volatile?"no-cache":"default",signal:globalThis.AbortSignal?.timeout?.(15000),
+    }).then(r=>{
       if (!r.ok) throw Error("Capa sin respuesta");
       return r.json();
     }).catch(e=>{cache.delete(path);throw e;}));
@@ -113,9 +115,23 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
   document.fonts?.ready.then(()=>{if(paths.length){measureLabels();invalidateLayout();}});
   const offsets=[[0,0],[0,-22],[0,24],[-22,0],[22,0],[0,-42],[0,44],[-30,-18],[30,-18],[-30,18],[30,18]];
   const overlaps=(a,b)=>a.left<b.right && a.right>b.left && a.top<b.bottom && a.bottom>b.top;
-  const warning=document.createElement("p");
-  warning.className="province-map-status"; warning.hidden=true; warning.setAttribute("role","status");
-  world.ownerSVGElement.parentElement.append(warning);
+  const warning=document.createElement("div"),message=document.createElement("span"),retry=document.createElement("button");
+  warning.className="province-map-status"; warning.hidden=true;
+  message.setAttribute("role","status");
+  retry.type="button";retry.textContent="Reintentar";retry.hidden=true;
+  warning.append(message,retry);frame.append(warning);
+  let retryTimer=0;
+  function showStatus(text="",retryAction=null) {
+    message.textContent=text;
+    warning.hidden=!text;
+    retry.onclick=retryAction;
+    retry.hidden=!retryAction;
+  }
+  window.addEventListener("online",()=>{if(!retry.hidden)retry.click();});
+  function mapScope(region,provinceReady) {
+    map.classList.toggle("atlas-province-view",provinceReady);
+    map.classList.toggle("atlas-region-view",Boolean(region) && !provinceReady);
+  }
   function scale(n) {
     if (!(n>0) || !Number.isFinite(n)) return;
     unit=n;
@@ -244,58 +260,56 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
     }
     paths.sort((a,b)=>Number(b.selected)-Number(a.selected) || Number(a.neighbour)-Number(b.neighbour));
     visibleFeatures=features;
-    world.ownerSVGElement.classList.remove("province-awaits-shape");
     if(selection)material.append(casing,selection);
     fills.replaceChildren(surfaces);
     boundaries.replaceChildren(material,...paths.map(p=>p.label));
+    mapScope(region,Boolean(selection));
+    showStatus();
     measureLabels();
     if(unit>0)scale(unit);
     if(active)boundaries.querySelector('[data-area="'+active+'"]')?.focus({preventScroll:true});
   }
-  function pendingSelection(selected) {
+  function pendingSelection(region) {
     paths=[]; visibleFeatures=[]; fills.replaceChildren(); boundaries.replaceChildren();
-    world.ownerSVGElement.classList.add("province-awaits-shape");
-    if(selected?.center) {
-      const label=svg("text",{class:"area-label current","text-anchor":"middle"});
-      label.textContent=selected.name;boundaries.append(label);
-      paths=[{p:selected,center:selected.center,label,selected:true}];
-      measureLabels();
-      if(unit>0)scale(unit);
-    }
+    mapScope(region,false);
+    showStatus(region?"Cargando límites provinciales…":"");
   }
-  async function scope(region,area,index) {
-    if (!index) return;
+  async function scope(region,area,index,retryCatalog=null,attempt=0) {
     const id=(area || "").slice(0,4);
     const key=region+":"+id;
-    if (key===lastScope) return;
+    if (!attempt && key===lastScope) return;
     const previous=lastScope;
     const order=++seq;
-    lastScope=key;warning.hidden=true;
-    if (!region) {
-      paths=[];visibleFeatures=[];fills.replaceChildren();boundaries.replaceChildren();
-      world.ownerSVGElement.classList.remove("province-awaits-shape");
+    clearTimeout(retryTimer);
+    lastScope=index?key:null;
+    if (!region || !index) {
+      pendingSelection(region);
+      if(!index && retryCatalog)showStatus("No se pudo cargar el listado de provincias.",retryCatalog);
       return;
     }
     const dep=index.department(region);
     if (!dep) return;
     const selected=id && index.byId.get(id);
-    if(previous?.startsWith(region+":") && visibleFeatures.length)
+    const reusable=previous?.startsWith(region+":") && visibleFeatures.length &&
+      (!id || visibleFeatures.some(feature=>feature.id===id));
+    if(reusable) {
       drawBoundaries(visibleFeatures,region,id,index);
-    else pendingSelection(selected);
-    if (selected?.box) fit(selected.box);
-    else if (!id && previous?.startsWith(region+":")) fitRegion(region);
+      if(selected?.box)fit(selected.box);
+      else if(!id)fitRegion(region);
+    } else pendingSelection(region);
     // Only department files contain province boundaries. Districts in reports
     // retain their source UBIGEO and never request another geometry layer.
     const readDepartment=code=>json("./atlas/territorios/"+code+".json");
     try {
       const set=await readDepartment(dep);
       if(order!==seq)return;
-      if(!id && region==="Lima Metropolitana") {
-        drawBoundaries(set.features.filter(p=>p.id==="1501"),region,id,index);
-      } else drawBoundaries(set.features,region,id,index);
-      if(id && !selected?.box) {
-        const shape=set.features.find(p=>p.id===id);
-        if(shape)fit(shape.box);
+      const mainFeatures=!id && region==="Lima Metropolitana" ? set.features.filter(p=>p.id==="1501") : set.features;
+      if(!reusable) {
+        drawBoundaries(mainFeatures,region,id,index);
+        const box=selected?.box || (id && mainFeatures.find(p=>p.id===id)?.box);
+        if(box)fit(box);
+      } else if(visibleFeatures.some(p=>p.id.slice(0,2)!==dep)) {
+        drawBoundaries(mainFeatures,region,id,index);
       }
       if (!selected?.box) return;
       // Show provinces across a department border when they are visible in
@@ -314,9 +328,10 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
       if(order!==seq)return;
       // Keep the national outline under the selected location. Never leave
       // the previous region's boundaries on a new selection after a failure.
-      pendingSelection(selected);lastScope=null;
-      warning.textContent="Límites provinciales pendientes de carga. Puedes consultar las fichas.";
-      warning.hidden=false;
+      pendingSelection(region);
+      const again=()=>scope(region,area,index,null,attempt+1);
+      showStatus("No se pudieron cargar los límites provinciales.",again);
+      if(attempt===0)retryTimer=setTimeout(again,1500);
     }
   }
   function markers(signals,index,anchor,scope,clearance) {

@@ -73,7 +73,7 @@
 .record-timeline {padding:10px 0}.record-timeline summary {cursor:pointer;font-weight:600}
 .record-timeline li {margin:9px 0}
 @media(prefers-reduced-motion:no-preference){
-  .pin-glyph {animation:pin-arrival .28s cubic-bezier(.22,.65,.35,1) both}
+  .pin-glyph {animation:pin-arrival .28s cubic-bezier(.22,.65,.35,1)}
   .local-boundaries path {animation:boundary-arrival .28s ease-out}
   .hazard-polygons path {animation:boundary-arrival .28s ease-out}
   .view-switch button,.signal-row {transition:background-color .22s,color .22s}

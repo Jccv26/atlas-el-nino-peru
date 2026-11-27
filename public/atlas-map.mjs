@@ -1,5 +1,5 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
-import {localMap} from "./mapa-local.mjs?v=7";
+import {localMap} from "./mapa-local.mjs?v=8";
 import {combinedLabels} from "./capa-todo.mjs?v=2";
 import {editionAsset} from "./publicacion.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
@@ -134,7 +134,7 @@ export function createCamera(map, onDraw) {
     stop();
     goal = next;
     framing = frame;
-    if (!animate || reducedMotion.matches) {
+    if (!animate || reducedMotion.matches || document.hidden) {
       draw(next);
       return;
     }
@@ -191,8 +191,14 @@ export function createCamera(map, onDraw) {
   }
   new ResizeObserver(resize).observe(map);
   resize();
+  function finishFlight() {
+    if (animation && goal) move(goal, false, framing);
+  }
+  // Browsers can suspend animation frames before a hidden tab paints its destination.
+  document.addEventListener("visibilitychange", finishFlight);
+  window.addEventListener("pageshow", event => { if (event.persisted) finishFlight(); });
   reducedMotion.addEventListener("change", () => {
-    if (animation && goal && reducedMotion.matches) move(goal, false, framing);
+    if (reducedMotion.matches) finishFlight();
   });
   return {
     home: () => move(home),
@@ -932,11 +938,9 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     refreshOcean,
     local(scope, signals, notices, index) {
       const provincial=Boolean(scope.area);
-      map.classList.toggle("atlas-province-view",provincial);
-      map.classList.toggle("atlas-region-view",Boolean(scope.region && !provincial));
       regionGroup.setAttribute("aria-hidden",String(provincial));
       regions.get(tabRegion)?.setAttribute("tabindex",provincial?"-1":"0");
-      void localOverlay.scope(scope.region,scope.area,index);
+      void localOverlay.scope(scope.region,scope.area,index,scope.retryCatalog);
       localOverlay.markers(signals,index,name=>anchors.get(name),scope,clearance);
       void localOverlay.sectors(notices,Date.now(),scope.area && index?.byId.get(scope.area.slice(0,4)));
       frame.classList.toggle("has-local-area",Boolean(scope.area));

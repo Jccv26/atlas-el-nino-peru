@@ -1,5 +1,5 @@
 import {mostrarHistoria} from "./historia-comparada.mjs";
-import {explorer} from "./explorar.mjs?v=9";
+import {explorer} from "./explorar.mjs?v=10";
 import {applyVerifiedPressLocations} from "./ubicacion-prensa.mjs";
 import {initialLayer,combinedLabels,regionalOverview} from "./capa-todo.mjs?v=2";
 import {hydrologyIndexUrl} from "./avisos-hidrologicos-api.mjs";
@@ -8,12 +8,12 @@ import {weatherIndexUrl} from "./avisos-meteorologicos-api.mjs";
 import {meteorologicalReader,withMeteorologicalReading} from "./consulta-meteo.mjs";
 import {isRiverNotice,stationReading,riverValidity} from "./estacion-hidrologica.mjs";
 import {signalDates} from "./resumen-territorial.mjs?v=2";
-import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs?v=3";
+import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs?v=4";
 import {shareControl,sharePayload} from "./compartir.mjs?v=2";
 import {recordDates,recordSources} from "./ficha-aviso.mjs";
 import {visualPanel} from "./material-visual.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
-import { createMap, mapCities } from "./atlas-map.mjs?v=11";
+import { createMap, mapCities } from "./atlas-map.mjs?v=12";
 import {editionAsset} from "./publicacion.mjs";
 import {renderRegionalPress} from "./prensa-regional.mjs?v=3";
 import {portStatusPanel} from "./puertos.mjs";
@@ -544,6 +544,7 @@ function noticeShare(record) {
 }
 let openedNotice="";
 let territoriesReady=false;
+let catalogRequest=null,catalogFailed=false,catalogRetryTimer=0;
 let lastShareScope="";
 let initialPressAnchor=location.hash==="#prensa-regional";
 if(initialPressAnchor) {
@@ -1089,7 +1090,7 @@ function syncLayer() {
     }
   }
   map?.select(region, selectedCity);
-  const result=localExplorer.render({panel,items:mappedItems,index:catalog,map,region,area:ubigeo,city:selectedCity,view:mode,layer,hazard,readFailed:editionReadFailed});
+  const result=localExplorer.render({panel,items:mappedItems,index:catalog,map,region,area:ubigeo,city:selectedCity,view:mode,layer,hazard,readFailed:editionReadFailed,retryCatalog:catalogFailed?readCatalog:null});
   const shareScope=[region,ubigeo,selectedCity,layer,mode,hazard].join("|");
   if(shareScope!==lastShareScope) {
     lastShareScope=shareScope;
@@ -1674,16 +1675,32 @@ for(const b of document.querySelectorAll("[data-view]")) b.onclick=()=>{
   changed();
 };
 const placeOptions=new Map();
-void loadTerritories().then(index=>{
-  territoriesReady=true;
-  catalog=index;
-  for(const p of index.places.filter(p=>p.id.length===4)) {
-    const description=index.label(p.id)+" (provincia)";
-    placeOptions.set(normalizePlace(description),p.id);
-  }
-  updateSuggestions();
-  restoreLocation();
-}).catch(()=>{territoriesReady=true;}).finally(()=>{void openSharedNotice();});
+function readCatalog(allowAutoRetry=false) {
+  if(catalog || catalogRequest)return;
+  clearTimeout(catalogRetryTimer);
+  const retrying=catalogFailed;
+  catalogFailed=false;
+  catalogRequest=loadTerritories().then(index=>{
+    catalog=index;
+    for(const p of index.provinces) {
+      const description=index.label(p.id)+" (provincia)";
+      placeOptions.set(normalizePlace(description),p.id);
+    }
+    updateSuggestions();
+    // Read the current URL; the visitor may have navigated while the network was down.
+    restoreLocation();
+  },()=>{
+    catalogFailed=true;
+    if(allowAutoRetry===true)catalogRetryTimer=setTimeout(readCatalog,1500);
+    syncLayer();
+  }).finally(()=>{
+    catalogRequest=null;
+    territoriesReady=true;
+    void openSharedNotice();
+  });
+  if(retrying)syncLayer();
+}
+readCatalog(true);
 function updateSuggestions() {
   const q=normalizePlace($("searchInput").value);
   if(!catalog || q.length<2) return;
@@ -2133,6 +2150,7 @@ setInterval(refreshPage, 5 * 60 * 1000);
 setInterval(()=>{if(!document.hidden && panel){showEditionTime(editionReadFailed);syncLayer();}},60000);
 document.addEventListener("visibilitychange", refreshPage);
 window.addEventListener("online", () => {
+  if(catalogFailed)readCatalog();
   lastRefresh = 0;
   refreshPage();
 });

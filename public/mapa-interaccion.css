@@ -177,7 +177,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .atlas-map-ready #mapWorld {
-    animation: atlas-reveal 450ms ease-out both;
+    animation: atlas-reveal 450ms ease-out;
   }
   .atlas-map-ready .atlas-map-tip:not([hidden]) {
     animation: atlas-tip-in 110ms ease-out both;
@@ -504,15 +504,28 @@
 }
 .province-map-status {
   position: absolute;
-  left: 12px;
-  bottom: 32px;
-  max-width: calc(100% - 24px);
-  padding: 6px 10px;
+  z-index: 2;
+  left: 50%;
+  top: 104px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 28px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
   margin: 0;
-  color: #fff;
-  background: #153031;
+  border: 1px solid #64847d;
+  border-radius: 8px;
+  color: #e3f2e9;
+  background: #153031f5;
   font-size: 12px;
-  pointer-events: none;
+}
+.province-map-status button {
+  color: #a2ead4;
+  min-height: 32px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 #map.map-zoomed,
 #map {
@@ -525,8 +538,4 @@
 #map.atlas-province-view #regions .region-path {
   stroke: none;
   transition: none;
-}
-#map.atlas-province-view.province-awaits-shape #regions .region-path.focused {
-  stroke: #a6d3c4;
-  stroke-width: 1.6px;
 }

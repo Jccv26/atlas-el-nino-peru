@@ -702,18 +702,54 @@ details[open] .detail-plus {
   margin: 0;
 }
 footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 54ch) 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
   border-top: 1px solid var(--line);
-  padding: 18px var(--edge);
+  padding: 24px var(--edge);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
-footer i {
-  font-style: normal;
+.footer-brand strong {
+  color: var(--paper);
+}
+.footer-brand span {
+  margin-inline: 3px;
   color: var(--aqua);
-  padding: 0 4px;
+}
+.footer-credit {
+  text-align: center;
+  text-wrap: balance;
+}
+.footer-credit p {
+  margin: 0;
+}
+.footer-credit p:first-child {
+  margin-bottom: 4px;
+  color: var(--paper);
+  font-size: 15px;
+}
+.footer-credit a {
+  color: var(--aqua);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer-credit p:first-child a {
+  font-weight: 650;
+}
+.footer-return {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--aqua);
+  font-weight: 600;
+}
+.footer-return:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 dialog {
   width: min(calc(100% - 28px), 550px);
@@ -1033,9 +1069,16 @@ dialog a {
     padding-bottom: 24px;
   }
   footer {
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 12px;
+    padding-block: 24px 14px;
+  }
+  .footer-credit {
+    max-width: 54ch;
+  }
+  .footer-return {
+    justify-self: center;
   }
   .source-row a {
     font-size: 14px;
@@ -1405,18 +1448,6 @@ html {
 .source-row[data-status="error"] .source-status {
   color: #f6cf8d;
 }
-footer a {
-  color: var(--aqua);
-}
-.footer-credit {max-width:58ch;padding:0 14px;font-size:12px;line-height:1.5}
-.footer-credit p {margin:0}
-.footer-credit p + p {margin-top:3px}
-.footer-credit a {text-decoration:underline;text-underline-offset:2px}
-@media (max-width:760px) {
-  footer {display:grid;grid-template-columns:1fr auto}
-  footer > a {grid-area:1 / 2}
-  .footer-credit {grid-column:1 / -1;padding:0}
-}
 @media (max-width: 900px) {
   .map-hint {
     bottom: 12px;
@@ -1595,10 +1626,6 @@ footer a {
   }
   .item b {
     font-size: 14px;
-  }
-  footer {
-    flex-wrap: wrap;
-    align-items: center;
   }
 }
 @media (prefers-reduced-motion: reduce) {

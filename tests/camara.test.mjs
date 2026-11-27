@@ -8,8 +8,13 @@ const ayabaca = { x: 24.45, y: 10.28, width: 1.41, height: 0.83 };
 function setup(t) {
   let width = 390, height = 414, clock = 0, frameId = 0, onResize;
   const frames = new Map();
+  const page = new EventTarget();
+  page.hidden = false;
+  page.visibilityState = 'visible';
+  page.getElementById = () => ({});
   const globals = {
-    document: { getElementById: () => ({}) },
+    document: page,
+    window: new EventTarget(),
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     requestAnimationFrame(callback) {
       frames.set(++frameId, callback);
@@ -34,6 +39,11 @@ function setup(t) {
   };
   return {
     camera: createCamera(map, () => {}),
+    setHidden(hidden) {
+      page.hidden = hidden;
+      page.visibilityState = hidden ? 'hidden' : 'visible';
+      page.dispatchEvent(new Event('visibilitychange'));
+    },
     advance(ms) {
       clock += ms;
       const pending = [...frames.values()];
@@ -68,6 +78,25 @@ test('al girar en pleno acercamiento se completa el encuadre de la provincia par
     assert.ok(Math.abs(rotated[key] - directlySelected[key]) < 1e-8,
       `La cámara debe llegar al mismo ${key} al girar o al seleccionar la provincia en horizontal`);
   }
+});
+
+test('al volver a la pestaña se ve la última provincia elegida aunque no hayan corrido cuadros en segundo plano', t => {
+  const {camera, advance, setHidden} = setup(t);
+  camera.fit(ayabaca, true);
+  advance(500);
+  const expected = camera.snapshot();
+  camera.home();
+  advance(500);
+
+  camera.fit(piuraRegion);
+  advance(60);
+  setHidden(true);
+  camera.fit(ayabaca, true);
+  setHidden(false);
+  advance(16);
+
+  const visible = camera.snapshot();
+  for (const field of ['x', 'y', 'z']) assert.ok(Math.abs(visible[field] - expected[field]) < 1e-8, field);
 });
 
 test('tocar durante el encuadre no ofrece desplazamiento libre fuera del territorio', t => {

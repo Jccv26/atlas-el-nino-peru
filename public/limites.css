@@ -36,6 +36,9 @@
   stroke-width:1.4px;
   stroke-linejoin:round;
   cursor:pointer;
+  /* A native pointer-focus outline is measured in SVG units and can cover
+     the viewport when zoomed. Keyboard focus uses the screen-width stroke. */
+  outline:none;
 }
 #map .local-area.adjacent {stroke:#829e99;stroke-dasharray:4 3}
 #map .province-selection-casing {
@@ -47,13 +50,16 @@
 }
 #map .local-area.is-selected {stroke:#f2ffe5;stroke-width:2.8px}
 #map .local-area:focus-visible {outline:none;stroke:#fff;stroke-width:3px}
+#map .map-city {outline:none}
+#map .map-city:focus-visible text {fill:#e3ffea;stroke:#153936;paint-order:stroke}
+#map .map-city:focus-visible circle {stroke:#fff;stroke-width:2px}
 @media (hover:hover) {
   #map .local-area:not(.is-selected):hover {stroke:#e0f1e6;stroke-width:2px}
 }
 #map .area-label.current {stroke:#19352f}
 .map-frame.has-region .coverage-text:not(:disabled)::before {content:none}
 .selected-province-key {display:none}
-.has-local-area .selected-province-key {
+.has-local-area:has(#map.atlas-province-view) .selected-province-key {
   display:flex;align-items:center;gap:7px;margin-top:4px;font-size:11px;color:#d2e3dc;
 }
 .selected-province-key::before {

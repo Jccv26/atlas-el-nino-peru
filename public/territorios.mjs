@@ -40,7 +40,8 @@ export function territoryIndex(data) {
   return {byId, names, regionOf, resolve, children, department, label, places, provinces:data.provinces};
 }
 export async function loadTerritories() {
-  const res = await fetch(new URL("./atlas/territorios/catalogo.json", import.meta.url));
+  const res = await fetch(new URL("./atlas/territorios/catalogo.json", import.meta.url),
+    {signal:globalThis.AbortSignal?.timeout?.(15000)});
   if (!res.ok) throw Error("Catálogo territorial no disponible");
   return territoryIndex(await res.json());
 }

@@ -197,7 +197,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
       b.onclick=()=>onPlace(r.region,"");container.append(b);
     }
   }
-  function render({panel,items,index,map,region,area,city,view,layer,hazard,readFailed=false,now=Date.now()}) {
+  function render({panel,items,index,map,region,area,city,view,layer,hazard,readFailed=false,retryCatalog=null,now=Date.now()}) {
     latestPanel=panel;scopeArea=area;scopeRegion=region;scopeCatalog=index;
     const verified=!readFailed && activeSchedule(panel,now);
     const stamp=panel?.updatedAt;
@@ -247,7 +247,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     }
     // Forecasts published only for a region remain in its regional context. They never become district pins.
     const drawn=current.filter(s=>!s.item?.sectorMap && s.type!=="aviso" && (combined || !s.recent || view==="pronostico" || !current.some(o=>o.id!==s.id && o.type===s.type && o.area===s.area && o.locality===s.locality && Date.parse(o.at)>Date.parse(s.at))));
-    map?.local({region,area,layer},drawn,view==="pronostico" && !combined?current.filter(s=>s.item?.sectorMap && s.item.sourceId==="senamhi-"+hazard):[],index);
+    map?.local({region,area,layer,retryCatalog},drawn,view==="pronostico" && !combined?current.filter(s=>s.item?.sectorMap && s.item.sourceId==="senamhi-"+hazard):[],index);
     const root=$("placeTrail"),title=city || (area==="1501" ? "Lima Metropolitana" : area && index?.byId.get(area)?.name) || regionTitle(region) || "Todo el Perú";
     const nextTrailKey=[region,area,city,title,Boolean(index)].join("|");
     if(trailKey!==nextTrailKey){root.replaceChildren();
