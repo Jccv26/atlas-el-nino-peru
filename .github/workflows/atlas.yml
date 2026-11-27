@@ -74,6 +74,16 @@ jobs:
           diagnostico "Índice nacional de avisos" 'https://www.senamhi.gob.pe/?p=avisos-hidrologicos'
           diagnostico "Capa publicada por IDESEP" 'https://idesep.senamhi.gob.pe/geoserver/g_dbphisis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=g_dbphisis%3Aaviso_hidro_pub&outputFormat=application%2Fjson'
           diagnostico "Consulta de avisos del visor PHISIS" 'https://www.senamhi.gob.pe/mapas/mapa-aviso-hidro/include/ajaxIdesepWFSAvisos.php'
+          node --input-type=module <<'NODE'
+          try {
+            const response = await fetch('https://servicios.senamhi.gob.pe/api/hydrology/warnings?status=ACTIVE', {signal: AbortSignal.timeout(14000)});
+            const data = await response.json();
+            if (!response.ok || data.status !== true || !Array.isArray(data.data)) throw new Error('Respuesta sin listado de avisos');
+            console.log('Servicio hidrológico de SENAMHI', response.status, '· avisos activos', data.data.length);
+          } catch (error) {
+            console.log('Servicio hidrológico de SENAMHI sin lectura desde el servidor:', error.cause?.code ?? error.message);
+          }
+          NODE
       - name: Preparar la lectura de boletines oficiales en PDF
         run: |
           if ! command -v pdftotext >/dev/null; then
