@@ -23,6 +23,10 @@ GitHub Pages entrega únicamente la carpeta pública. GitHub Actions consulta la
 
 Las capas de lluvias y ríos muestran avisos oficiales vigentes, próximos y reportes con menos de 72 horas sin vigencia definida. La capa Mar combina la anomalía térmica diaria de NOAA con los tramos que Hidrografía identifica en sus avisos de oleaje. El filtro regional incluye las jurisdicciones cuyo litoral cruza esos tramos. La ficha enlaza el aviso original y distingue los niveles que SENAMHI asigna a distintos sectores de una región.
 
+En Lluvias, la fecha que muestra cada mapa diario de SENAMHI determina cuándo corresponde el aviso a cada región. Si faltan días en la fuente, se conserva el alcance documentado del aviso. En el detalle nacional se puede abrir también el visor de lluvia de las próximas dos horas y consultar la fecha de su última observación.
+
+En Mar, el estado de las instalaciones portuarias se consulta directamente en DICAPI. La ficha distingue puertos marítimos, fluviales y lacustres, muestra la hora de consulta y enlaza la resolución cuando la autoridad la publica. El ámbito regional comprende las instalaciones identificadas geográficamente.
+
 El indicador de récord consulta diariamente la serie semanal de temperatura Niño 1+2 de NOAA. Muestra el máximo de la serie, su semana y la climatología de referencia. Si la fuente falla, continúa disponible la última observación verificada.
 
 El publicador consulta también los PDF de lluvias intensas, quebradas, ríos y meteorología que reproduce el COEN. El mapa agrupa las dos publicaciones cuando el boletín identifica expresamente el número, el año y la serie de SENAMHI. Cada ficha conserva sus enlaces oficiales. Un documento con fechas de vigencia contradictorias permanece disponible para consulta y se excluye de la cobertura del mapa.

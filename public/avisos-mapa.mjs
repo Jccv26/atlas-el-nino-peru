@@ -95,7 +95,7 @@ function regionsOf(item) {
 function mergeGroup(members) {
   const original = members.find((m) => m.sourceId !== "coen");
   let primary =
-    original ?? members.find((m) => !m.rosterListedAt && regionsOf(m).length) ?? members.find((m) => regionsOf(m).length) ?? members[0];
+    original ?? members.find((m) => !m.rosterListedAt && !m.meteoRosterAt && regionsOf(m).length) ?? members.find((m) => regionsOf(m).length) ?? members[0];
   if (members.length === 1) return primary;
   const roster = members.filter((m) => m.rosterListedAt).sort((a,b)=>b.rosterListedAt.localeCompare(a.rosterListedAt))[0];
   const endAt = (m) => Date.parse(m.validUntil?.length===10 ? m.validUntil+"T23:59:59-05:00" : m.validUntil);
@@ -122,10 +122,14 @@ function mergeGroup(members) {
       )
         levels[canonical] = localLevels;
       const namedProvinces = m.provincesByRegion?.[name];
-      if (Array.isArray(namedProvinces) && namedProvinces.length)
-        provinces[canonical] = [
-          ...new Set([...(provinces[canonical] || []), ...namedProvinces]),
-        ];
+      if (Array.isArray(namedProvinces) && namedProvinces.length) {
+        const known=new Map((provinces[canonical] || []).map(name=>[fold(name),name]));
+        for (const name of namedProvinces) {
+          const existing=known.get(fold(name));
+          if (!existing || (name!==name.normalize('NFD') && existing===existing.normalize('NFD'))) known.set(fold(name),name);
+        }
+        provinces[canonical]=[...known.values()];
+      }
     }
     for (const url of m.coverageUrls ?? []) documents.add(url);
     if (m.url && !refs.has(m.url)) {
@@ -166,7 +170,41 @@ function mergeGroup(members) {
   return result;
 }
 
-export function layerRecords(items) {
+const localDay=value=>/^\d{4}-\d{2}-\d{2}$/.test(value) ? value :
+  new Date(new Date(value).getTime()-5*3600000).toISOString().slice(0,10);
+
+// Only a complete sequence can establish that a region is absent on a
+// given day. The full national notice still links to all original maps.
+export function noticeForRegionDay(item,region,now=Date.now()) {
+  if (!item?.coverageDaysComplete || !item.coverageDays?.length) return item;
+  const today=localDay(now);
+  const days=item.coverageDays.filter(d=>d.date>=today && (!region || d.regions.includes(region)));
+  if (!days.length) return null;
+  const areas=region?[region]:[...new Set(days.flatMap(d=>d.regions))];
+  const provinces={};
+  // A regional card describes its current (or next) applicable forecast day.
+  for (const day of region ? [days[0]] : days) for (const [key,places] of Object.entries(day.provincesByRegion || {})) {
+    if (region && key!==region) continue;
+    const dedup=new Map((provinces[key] || []).map(p=>[fold(p),p]));
+    for (const p of places) dedup.set(fold(p),p);
+    provinces[key]=[...dedup.values()];
+  }
+  const base={...item,regions:areas,region:areas.join(", "),provincesByRegion:provinces};
+  if (!region) return base;
+  const first=days[0].date;
+  let last=first;
+  for (const d of days.slice(1)) {
+    if (Date.parse(d.date)-Date.parse(last)!==86400000) break;
+    last=d.date;
+  }
+  const originalFrom=item.noticeValidFrom || item.validFrom;
+  const originalUntil=item.noticeValidUntil || item.validUntil;
+  return {...base,applicableDates:days.map(d=>d.date),provinceScopeDate:first,noticeValidFrom:originalFrom,noticeValidUntil:originalUntil,
+    validFrom:originalFrom && localDay(originalFrom)===first?originalFrom:first+"T00:00:00-05:00",
+    validUntil:originalUntil && localDay(originalUntil)===last?originalUntil:last+"T23:59:59-05:00"};
+}
+
+export function layerRecords(items,now=Date.now()) {
   const groups = new Map(),
     order = [];
   for (const item of items ?? []) {
@@ -196,5 +234,5 @@ export function layerRecords(items) {
     if (originals.length > 1) result.push(...usable);
     else if (usable.length) result.push(mergeGroup(usable));
   }
-  return result;
+  return result.map(item=>noticeForRegionDay(item,"",now)).filter(Boolean);
 }

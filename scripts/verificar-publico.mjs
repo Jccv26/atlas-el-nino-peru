@@ -56,6 +56,25 @@ function privateKeys(obj, where, issues) {
 
 const senamhiNotices = new Set(['senamhi-lluvias','senamhi-quebradas','senamhi-meteo','senamhi-rios']);
 
+function checkPortStatus(source, where, issues) {
+  const listing = source.portStatus;
+  if (!listing) return;
+  if (source.id!=='dicapi' || !Array.isArray(listing.ports) || !listing.ports.length || !listing.coastal) {
+    issues.push(where+' · listado portuario inválido');
+    return;
+  }
+  for (const port of listing.ports) {
+    if (!port || !isText(port.name) || !isText(port.captaincy) || !['open','partial','closed'].includes(port.status) ||
+        (port.date && !isTimestamp(port.date)) || (port.url && !publicUrl(port.url,'www.dicapi.mil.pe')))
+      issues.push(where+' · estado o procedencia del puerto inválida');
+    if (port) checkPrivacy(port,['name','captaincy','region'],where,issues);
+  }
+  for (const [group,ports] of [[listing,listing.ports],[listing.coastal,listing.ports.filter(p=>p?.area==='Marítimo')]]) {
+    if (group.total!==ports.length || ['open','partial','closed'].some(key=>group[key]!==ports.filter(p=>p?.status===key).length))
+      issues.push(where+' · totales portuarios incoherentes');
+  }
+}
+
 function checkCoenDocument(item, asOf, where, issues) {
   if (!item.coenDocument && !item.originNotice && item.regionOrigin!=='pdf-coen') return;
   const doc = item.coenDocument;
@@ -106,7 +125,7 @@ function checkExplanations(p, issues) {
       Array.isArray(e.notices) || Array.isArray(e.regions)) {
     issues.push('Explicaciones · formato inválido'); return;
   }
-  const mapped = new Map(layerRecords(p.items).map(i => [i.id,i]));
+  const mapped = new Map(layerRecords(p.items, Date.parse(p.updatedAt)).map(i => [i.id,i]));
   for (const [id,n] of Object.entries(e.notices)) {
     const source = mapped.get(id);
     if (!source || source.kind !== 'oficial' || source.withdrawnAt || !n ||
@@ -154,6 +173,10 @@ function checkSnapshot(p, files, issues, notes) {
     if (s.status==='stale' && !isTimestamp(s.lastSuccessAt)) issues.push(where+' · datos conservados sin fecha de procedencia');
     if (s.status==='stale'||s.status==='error') notes.push(definition.name+' · '+(s.status==='stale'?'última lectura conservada':'sin lectura en este corte'));
     if (s.status!=='external' && (!Number.isInteger(s.count) || s.count<0)) issues.push(where+' · recuento inválido');
+    checkPortStatus(s,where,issues);
+    if (s.nowcasting && (s.id!=='senamhi-muy-corto' ||
+        ['observedAt','forecast1h','forecast2h'].some(field=>!isTimestamp(s.nowcasting[field]))))
+      issues.push(where+' · fecha del visor de lluvia inválida');
   }
   for (const [index,it] of p.items.entries()) {
     const where='registro '+index;
@@ -169,6 +192,10 @@ function checkSnapshot(p, files, issues, notes) {
       if (it[field]!=null && !isTimestamp(it[field])) issues.push(where+'.'+field+' · fecha inválida');
     }
     checkPrivacy(it,['title','summary','locality','region'],where,issues);
+    if (it.coverageDays && (!Array.isArray(it.coverageDays) || it.sourceId!=='senamhi-meteo' ||
+        it.coverageDays.some(d=>!d || !isTimestamp(d.date) || !Array.isArray(d.regions) || !d.regions.length ||
+          !publicUrl(d.url,'www.senamhi.gob.pe') || !it.coverageUrls?.includes(d.url))))
+      issues.push(where+' · desglose diario sin origen o fecha válida');
     checkCoenDocument(it,asOf,where,issues);
     if(it.supersededBy && (!isText(it.supersededBy) || !publicUrl(it.supersededUrl,new URL(registry.get(it.sourceId).url).hostname))) issues.push(where+' · actualización sin referencia del emisor');
     for (const u of it.coverageUrls ?? []) {
