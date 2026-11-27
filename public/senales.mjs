@@ -1,5 +1,7 @@
 import {noticeCovers} from "./territorios.mjs?v=3";
 
+import {isRiverNotice,stationReading,riverValidity} from "./estacion-hidrologica.mjs";
+
 const hour = 3600000;
 const number = new Intl.NumberFormat("es-PE", {maximumFractionDigits:2});
 const time = value => Date.parse(value || "");
@@ -57,13 +59,24 @@ export function localSignals(panel, items, index, now=Date.now()) {
       title:event.recovery?.text || event.corroboratedClaim || (event.summary && event.summary.length<=120 ? event.summary : event.title), text:event.summary, event});
   }
   for (const it of items) {
-    const hydro = it.stationName && (it.sourceId==="senamhi-rios" || it.originNotice?.sourceId==="senamhi-rios" || it.category==="Ríos");
-    if (hydro) {
-      const at = it.observedAt || it.publishedAt || it.validFrom;
-      if (!(now>=time(at) && now-time(at)<48*hour)) continue;
-      add({id:it.id,type:"estacion",mode:"ahora",layer:"rios",mark:"rio",label:"Estación hidrológica",title:it.stationName+(it.level?" · umbral "+it.level.toLowerCase():""),text:it.summary,
-        at,expiresAt:it.validUntil, recent:now-time(at)>3*hour, region:it.regions?.[0],province:it.stationProvince,district:it.stationDistrict,coordinates:it.coordinates,
-        source:it.sourceName,url:it.url,item:it});
+    if (isRiverNotice(it)) {
+      const reading=stationReading(it);
+      const status=riverValidity(it,now);
+      const active=status==="vigente" || status==="listado";
+      if(["sinconfirmar","actualizado","retirado","proximo"].includes(status) || time(it.publishedAt)>now)continue;
+      if(reading && time(reading.at)>now)continue;
+      if(!active && (!reading || now-time(reading.at)>=48*hour))continue;
+      const regions=it.regions || [];
+      if(!reading && !regions.length)continue;
+      const region=regions.length===1 ? regions[0] : undefined;
+      const description=[reading?.value,it.level && "umbral "+it.level.toLowerCase()].filter(Boolean).join(" · ");
+      const title=reading ? reading.name+(description?" · "+description:"") : short(it.phenomenon || it.title);
+      add({id:it.id,type:"estacion",mode:"ahora",layer:"rios",mark:"rio",
+        label:status==="vigente"?"Aviso hidrológico vigente":status==="listado"?"Aviso en el listado de SENAMHI":"Medición de estación",
+        title,text:it.summary,riverMetric:reading?.metric,observedAt:reading?.at,
+        at:reading?.at || it.publishedAt,issuedAt:it.publishedAt,expiresAt:it.validUntil,stationStatus:status,
+        recent:!active && now-time(reading?.at)>3*hour,region,regions,province:it.stationProvince,district:it.stationDistrict,
+        locality:reading?.name,coordinates:it.coordinates,source:it.sourceName || it.source,url:it.url,item:it});
       continue;
     }
     if (it.radarType || it.kind!=="oficial" || it.invalidValidity || it.withdrawnAt || it.supersededBy || now>localTime(it.validUntil,true) || !Number.isFinite(localTime(it.validUntil,true))) continue;

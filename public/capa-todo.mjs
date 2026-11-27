@@ -1,8 +1,9 @@
+import {riverValidity} from "./estacion-hidrologica.mjs";
 const day=24*3600000;
 export const combinedPriority={grave:0,impacto:1,reportado:2,restablecido:3,observacion:4,pronostico:5};
 export const combinedLabels={
   grave:"Impacto grave confirmado",impacto:"Impacto documentado",reportado:"Impacto reportado",
-  restablecido:"Restablecimiento comunicado",observacion:"Medición o parte operativo",pronostico:"Cobertura de pronóstico",
+  restablecido:"Restablecimiento comunicado",observacion:"Medición, aviso de estación o parte operativo",pronostico:"Cobertura de pronóstico",
 };
 export function initialLayer(query) {
   const explicit=query.get("capa");
@@ -20,6 +21,11 @@ export function combinedTime(s) {
 }
 export function currentCombined(s,now) {
   if(s.mode==="pronostico")return true; // localSignals already checks validity in Peru, including future advisories.
+  if(s.type==="estacion" && s.item) {
+    const status=riverValidity(s.item,now);
+    if(["vigente","listado"].includes(status))return true;
+    if(!s.observedAt || ["sinconfirmar","actualizado","retirado","proximo"].includes(status))return false;
+  }
   const at=Date.parse(combinedTime(s));
   return at<=now && now-at<=day;
 }

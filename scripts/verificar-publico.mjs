@@ -254,6 +254,12 @@ function checkSnapshot(p, files, issues, notes) {
       for (const key of ['observedAt','phisisListedAt','withdrawnAt'])
         if (it[key]!=null && (!isTimestamp(it[key]) || Date.parse(it[key])>asOf+600000)) issues.push(where+' · hora hidrológica inválida');
       checkPrivacy(it,['stationName','stationProvince','stationDistrict'],where,issues);
+      if (it.riverMeasurement) {
+        const {kind,value,unit}=it.riverMeasurement;
+        const validUnit=(kind==='caudal' && unit==='m³/s') || (kind==='nivel' && ['m','m s. n. m.'].includes(unit));
+        if (!Number.isFinite(value) || !validUnit || !it.stationName || !it.observedAt)
+          issues.push(where+' · lectura hidrológica sin estación, hora o unidad consistente');
+      }
     }
     for (const part of it.coastalScope ?? []) {
       checkPrivacy(part,['zone','stretch'],where,issues);

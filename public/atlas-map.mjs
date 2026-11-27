@@ -1,6 +1,6 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
-import {localMap} from "./mapa-local.mjs?v=4";
-import {combinedLabels} from "./capa-todo.mjs";
+import {localMap} from "./mapa-local.mjs?v=5";
+import {combinedLabels} from "./capa-todo.mjs?v=2";
 import {editionAsset} from "./publicacion.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
 const svg = (tag, props = {}) => {

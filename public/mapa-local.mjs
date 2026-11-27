@@ -1,5 +1,5 @@
 import {editionAsset} from "./publicacion.mjs";
-import {combinedLabels,combinedPriority} from "./capa-todo.mjs";
+import {combinedLabels,combinedPriority} from "./capa-todo.mjs?v=2";
 const ns="http://www.w3.org/2000/svg";
 function svg(tag, props={}) {
   const el=document.createElementNS(ns,tag);

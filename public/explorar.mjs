@@ -1,10 +1,10 @@
 import {noticeForRegionDay} from "./avisos-mapa.mjs?v=4";
-import {activeSchedule, inScope, localSignals} from "./senales.mjs?v=2";
+import {activeSchedule, inScope, localSignals} from "./senales.mjs?v=3";
 import {regionTitle, normalizePlace} from "./territorios.mjs?v=3";
 import {recordDates,recordSources} from "./ficha-aviso.mjs";
 import {visualPanel as recordVisual} from "./material-visual.mjs";
-import {territorialBrief,signalDates} from "./resumen-territorial.mjs";
-import {combinedSignals,combinedLabels,currentCombined,regionalOverview} from "./capa-todo.mjs";
+import {territorialBrief,signalDates} from "./resumen-territorial.mjs?v=2";
+import {combinedSignals,combinedLabels,currentCombined,regionalOverview} from "./capa-todo.mjs?v=2";
 const $=id=>document.getElementById(id);
 export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPlace,noticeShare}) {
   let current=[],all=[],lastView="",lastResults="",trailKey="",latestPanel,scopeArea="",scopeRegion="",scopeCatalog;
@@ -114,7 +114,6 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     if(panel && index && area?.length===4 && area!=="1501" && !records.length) {
       const elsewhere=all.flatMap(s=>{
         if(!inScope(s,region,"",index))return [];
-        if(s.mode==="ahora" && now-Date.parse(s.type==="puerto" && s.checkedAt || s.at)>86400000)return [];
         if(!s.item?.coverageDaysComplete)return [s];
         const item=noticeForRegionDay(s.item,region,now);
         return item?[{...s,item,from:item.validFrom,expiresAt:item.validUntil}]:[];
@@ -126,7 +125,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     if(!panel || area && !index) facts.append(node("p","Consultando la edición del lugar…","brief-gap"));
     else if(!brief.highlights.length) {
       const scopeName=area?.length===6 ? "este distrito" : area?.length===4 ? "esta provincia" : city ? "esta ciudad" : "esta región";
-      facts.append(node("p","La edición no contiene mediciones recientes, impactos reportados en las últimas 24 horas ni pronósticos con cobertura documentada para "+scopeName+".","brief-gap"));
+      facts.append(node("p","La edición no contiene mediciones recientes, avisos hidrológicos vigentes, impactos reportados en las últimas 24 horas ni pronósticos con cobertura documentada para "+scopeName+".","brief-gap"));
       if(regionalFact) {
         const wider=node("div","","brief-context");
         wider.append(node("strong","Contexto regional de "+regionTitle(region)),node("p",regionalFact.label+" · "+regionalFact.text),node("small",regionalFact.date));
@@ -151,7 +150,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
         det.append(node("summary","Ver "+extra.childElementCount+(extra.childElementCount===1 ? " idea más" : " ideas más")),extra);
         facts.append(det);
       }
-      if(!records.some(s=>s.mode==="ahora")) facts.append(node("p","Las fuentes consultadas no aportan una observación o un impacto reciente para este lugar.","brief-gap"));
+      if(!records.some(s=>s.mode==="ahora")) facts.append(node("p","Las fuentes consultadas no aportan una observación reciente, un aviso hidrológico vigente o un impacto reciente para este lugar.","brief-gap"));
     }
     const originals=new Map(brief.sources.map(ref=>[ref.url,ref]));
     const addSource=(label,url,detail)=>{if(url && !originals.has(url))originals.set(url,{source:label,url,title:detail});};
@@ -216,7 +215,7 @@ export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPl
     all=localSignals(panel,items,index,now);
     const combined=layer==="todo";
     const matchesLayer=s=>combined || s.layer===layer;
-    const isRecent=s=>combined ? currentCombined(s,now) : s.mode==="pronostico" || now-Date.parse(s.type==="puerto" && s.checkedAt || s.at)<=24*3600000;
+    const isRecent=s=>combined || s.type==="estacion" ? currentCombined(s,now) : s.mode==="pronostico" || now-Date.parse(s.type==="puerto" && s.checkedAt || s.at)<=24*3600000;
     const viewRows=all.filter(s=>s.mode===view && matchesLayer(s));
     const viewSignals=combined ? combinedSignals(viewRows,now) : viewRows.filter(isRecent);
     const overview=combined ? regionalOverview(viewSignals) : [];

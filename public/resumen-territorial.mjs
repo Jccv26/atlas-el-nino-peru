@@ -23,6 +23,13 @@ export function signalDates(s) {
     return (s.from?"Vigencia · ":"Hasta ")+period(s.from,s.expiresAt);
   }
   if (s.type==="observacion") return "Medición · "+period(s.from,s.at);
+  if (s.type==="estacion") {
+    const measured=s.observedAt ? "Medición · "+dateLabel(s.observedAt) : s.issuedAt ? "Publicación · "+dateLabel(s.issuedAt) : "Aviso hidrológico";
+    if(s.stationStatus==="vigente")return measured+". Aviso vigente hasta "+dateLabel(s.expiresAt);
+    if(s.stationStatus==="listado")return measured+". En el listado de SENAMHI al "+dateLabel(s.item.phisisListedAt);
+    if(s.stationStatus==="finalizado")return measured+". Aviso finalizado el "+dateLabel(s.expiresAt);
+    return measured;
+  }
   const e=s.event;
   if (e) {
     const occurred=e.occurredAt && (e.occurredAtPrecision==="aproximada"?"Hecho, hora aproximada · ":"Hecho · ")+dateLabel(e.occurredAt);
@@ -43,7 +50,7 @@ const pointType = s => {
   return s.type;
 };
 const factTime = s => Date.parse(s.event?.recovery?.at || s.event?.occurredAt || s.at) || 0;
-const labels = {observacion:"Lluvia medida",estacion:"Nivel del río",puerto:"Estado del puerto",oleaje:"Pronóstico de oleaje",quebradas:"Pronóstico de quebradas","lluvia prevista":"Pronóstico de lluvia","radar previsto":"Pronóstico de las próximas horas"};
+const labels = {observacion:"Lluvia medida",estacion:"Aviso hidrológico",puerto:"Estado del puerto",oleaje:"Pronóstico de oleaje",quebradas:"Pronóstico de quebradas","lluvia prevista":"Pronóstico de lluvia","radar previsto":"Pronóstico de las próximas horas"};
 function point(s,context,records) {
   const e=s.event, type=pointType(s);
   const place=s.district || s.province || (e?.localities?.length===1 && e.localities[0]);
@@ -62,7 +69,7 @@ function point(s,context,records) {
     if(examples.length)sectors="El mapa incluye sectores de "+districts.length+(districts.length===1?" distrito":" distritos")+
       (districts.length>examples.length?", entre ellos ":", ")+joinList.format(examples)+".";
   }
-  const label=e ? (e.kind==="prensa"&&!e.corroborated ? "Reporte de "+e.source : s.mark==="grave" ? "Impacto grave confirmado" : s.mark==="restablecido" ? "Restablecimiento" : "Impacto documentado") : labels[type] || s.label;
+  const label=e ? (e.kind==="prensa"&&!e.corroborated ? "Reporte de "+e.source : s.mark==="grave" ? "Impacto grave confirmado" : s.mark==="restablecido" ? "Restablecimiento" : "Impacto documentado") : type==="estacion" && ["caudal","nivel"].includes(s.riverMetric) ? (s.riverMetric==="caudal" ? "Caudal del río" : "Nivel del río") : labels[type] || s.label;
   let body=title;
   const province=within.length===4 && context.index?.byId.get(within)?.name;
   if(province && s.item?.applicableDates?.length && s.type==="aviso") {

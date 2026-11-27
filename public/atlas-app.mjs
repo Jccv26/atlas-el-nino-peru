@@ -1,14 +1,15 @@
 import {mostrarHistoria} from "./historia-comparada.mjs";
-import {explorer} from "./explorar.mjs?v=7";
+import {explorer} from "./explorar.mjs?v=8";
 import {applyVerifiedPressLocations} from "./ubicacion-prensa.mjs";
-import {initialLayer,combinedLabels,regionalOverview} from "./capa-todo.mjs";
-import {signalDates} from "./resumen-territorial.mjs";
+import {initialLayer,combinedLabels,regionalOverview} from "./capa-todo.mjs?v=2";
+import {isRiverNotice,stationReading,riverValidity} from "./estacion-hidrologica.mjs";
+import {signalDates} from "./resumen-territorial.mjs?v=2";
 import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs?v=3";
 import {shareControl,sharePayload} from "./compartir.mjs?v=2";
 import {recordDates,recordSources} from "./ficha-aviso.mjs";
 import {visualPanel} from "./material-visual.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
-import { createMap, mapCities } from "./atlas-map.mjs?v=8";
+import { createMap, mapCities } from "./atlas-map.mjs?v=9";
 import {editionAsset} from "./publicacion.mjs";
 import {renderRegionalPress} from "./prensa-regional.mjs?v=3";
 import {portStatusPanel} from "./puertos.mjs";
@@ -269,18 +270,11 @@ const periodNames = {
   retirado: "Retirado del listado",
 };
 function validity(item, now = Date.now()) {
+  if (isRiverNotice(item)) return riverValidity(item,now);
   if (item.supersededBy) return "actualizado";
   if (item.withdrawnAt) return "retirado";
   const start = startOf(item.validFrom),
     end = ending(item.validUntil);
-  if (
-    item.sourceId === "senamhi-rios" &&
-    item.phisisListedAt &&
-    !item.validUntil
-  ) {
-    const age = now - startOf(item.phisisListedAt);
-    return age >= 0 && age <= 2 * 3600000 ? "listado" : "sinconfirmar";
-  }
   if (end < now) return "finalizado";
   if (start > now) return "proximo";
   if (start <= now && end >= now) return "vigente";
@@ -364,7 +358,7 @@ function explanationCredit(note) {
 }
 function explanationFor(item) {
   const note = panel?.explanations?.notices?.[item.id];
-  if (note?.what && note.meaning && ["ia", "fuentes"].includes(note.mode))
+  if (note?.what && note.meaning && ["ia", "fuentes"].includes(note.mode) && (!isRiverNotice(item) || stationReading(item)))
     return note;
   let what = simpleTitle(item.phenomenon || item.title);
   let meaning = "";
@@ -383,8 +377,9 @@ function explanationFor(item) {
     (item.sourceId === "senamhi-rios" ||
       item.originNotice?.sourceId === "senamhi-rios")
   ) {
+    const reading=stationReading(item);
     const station =
-      item.stationName ||
+      reading?.name || item.stationName ||
       (item.title || "").match(/\bestación\s+([^()]+)$/i)?.[1] ||
       item.locality;
     const river = (item.title || "").match(
@@ -400,16 +395,17 @@ function explanationFor(item) {
             boundary + letter.toLocaleUpperCase("es-PE"),
         );
     const level = item.level && String(item.level).toLocaleLowerCase("es-PE");
-    if (station)
-      what =
-        "SENAMHI midió el nivel del río" +
-        (river ? " " + placeName(river) : "") +
-        " en la estación " +
-        placeName(station) +
-        "." +
-        (level ? " El aviso indica umbral " + level + "." : "");
-    meaning =
-      "La medición describe el río en esa estación. La ficha oficial precisa qué poblados abarca el aviso.";
+    const riverName=river ? " "+placeName(river) : "";
+    if(reading) {
+      const subject=reading.metric ? "el "+reading.metric+" del río" : "el río";
+      what="SENAMHI midió "+subject+riverName+" en la estación "+placeName(reading.name)+
+        (reading.value?" ("+reading.value+")":"")+".";
+    } else if(station) {
+      what="SENAMHI publicó un aviso del río"+riverName+" para la estación "+placeName(station)+".";
+    }
+    if(level)what+=" El aviso indica umbral "+level+".";
+    meaning=reading ? "La medición corresponde al río en esa estación. La ficha oficial identifica los poblados que podrían verse afectados." :
+      "La ficha oficial describe la vigencia, la ubicación y los posibles efectos del aviso.";
   } else if (
     item.sourceId === "senamhi-lluvias" ||
     item.sourceId === "senamhi-quebradas"
@@ -543,7 +539,7 @@ function showRecord(item, fromLink=false) {
   if(item.validUntil || item.withdrawnAt || item.supersededBy)
     fields.push(node("p","Estado del aviso · "+periodNames[validity(item)]));
   fields.push(...recordDates([
-    ["Inicio de la medición",item.observedFrom],["Medición registrada",item.observedAt],
+    ["Inicio de la medición",item.observedFrom],["Medición registrada",isRiverNotice(item)?stationReading(item)?.at:item.observedAt],
     ["Publicación",item.publishedAt],["Día del pronóstico",item.forecastDate],
     ["Vigente desde",item.validFrom],["Vigente hasta",item.validUntil],
     ["Reposición prevista",item.expectedRestorationAt]
@@ -583,6 +579,8 @@ function showRecord(item, fromLink=false) {
     const levels=item.districtLevels[ubigeo].map(s=>s.toLowerCase()).join(" y ");
     fields.push(node("h3","Peligro en sectores del distrito"),node("p",catalog?.byId.get(ubigeo)?.name+" figura con nivel "+levels+". El nivel puede variar dentro del distrito. Consulta el mapa de la edición para localizar cada sector."));
   }
+  if (isRiverNotice(item) && (item.stationDistrict || item.stationProvince))
+    fields.push(node("p","Ubicación de la estación · "+[item.stationDistrict,item.stationProvince,item.regions?.join(", ")].filter(Boolean).join(" · ")));
   if (places(item).length)
     fields.push(node("p", "Ámbito mencionado: " + places(item).join(", ")));
   if (item.radarType) fields.push(node("p","Lugar citado por el parte · "+[item.locality,item.district,item.province,item.region].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i).join(", ")));
@@ -1240,7 +1238,7 @@ $("mapDetails").onclick = () => {
     const forecast=mode==="pronostico";
     dialog("Criterios y fuentes",forecast?"Pronósticos de mar, ríos y lluvias":"Cómo leer los impactos recientes",
       node("p",forecast?"La región se colorea cuando una fuente incluye sectores de su territorio en un pronóstico vigente o próximo. La ficha de cada aviso indica las fechas y el alcance más preciso publicado."
-        :"Cada región muestra el tipo de reporte más relevante de las últimas 24 horas. Una afectación puede limitarse a la localidad citada. La cantidad de reportes indica la cobertura disponible."),
+        :"Cada región reúne los reportes de las últimas 24 horas y los avisos hidrológicos que siguen vigentes. La ficha conserva la fecha original de cada medición. Una afectación puede limitarse a la localidad citada. La cantidad de reportes indica la cobertura disponible."),
       node("p",forecast?"Selecciona Lluvias para ver los sectores y niveles de peligro delimitados por SENAMHI."
         :"El impacto grave requiere evidencia reciente de una autoridad o corroboración independiente. Las fichas distinguen daños documentados, hechos reportados, restablecimientos, mediciones y partes operativos."),
       link("Reportes de emergencia del COEN ↗","https://portal.indeci.gob.pe/emergencias/"),
