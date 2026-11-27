@@ -2,8 +2,14 @@ name: Actualizar y publicar el atlas
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: '8,18,28,38,48,58 * * * *'
+    paths-ignore:
+      - '.github/workflows/**'
+  workflow_call:
+    secrets:
+      ATLAS_STATE_KEY:
+        required: false
+      OPENAI_API_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       contrastar_rutas:
