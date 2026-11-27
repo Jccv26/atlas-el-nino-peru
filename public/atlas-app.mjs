@@ -107,7 +107,7 @@ let panel = null,
   oceanTime = null,
   oceanProduct = "",
   oceanSource = null,
-  requested = 0,
+  editionInFlight = null,
   editionReadFailed = false,
   audio = null,
   speaking = false;
@@ -1951,19 +1951,25 @@ $("listen").onclick = async () => {
   play.click();
 };
 $("infoDialog").addEventListener("close", stopAudio);
-async function load(forceCheck = false) {
-  const run = ++requested;
+function load(forceCheck = false) {
+  editionInFlight ??= readEdition(forceCheck).finally(() => {
+    editionInFlight = null;
+  });
+  return editionInFlight;
+}
+async function readEdition(forceCheck) {
   const paths = location.hostname.endsWith(".github.io")
     ? ["./data/panorama.json"]
     : ["./api/panorama", "./data/panorama.json"];
   for (const path of paths) {
     try {
       const asset=editionAsset(path);
+      const staticEdition = path.endsWith(".json");
       // A shared time bucket keeps the published edition discoverable behind Pages' CDN.
-      if(path.endsWith(".json"))asset.searchParams.set("corte",String(Math.floor(Date.now()/(forceCheck?60000:300000))));
+      if(staticEdition)asset.searchParams.set("corte",String(Math.floor(Date.now()/(forceCheck?60000:300000))));
       const res = await fetch(asset, {
         cache: "no-cache",
-        signal: globalThis.AbortSignal?.timeout?.(7500),
+        signal: globalThis.AbortSignal?.timeout?.(staticEdition ? 30000 : 7500),
       });
       if (!res.ok) continue;
       const data = await res.json();
@@ -1973,7 +1979,6 @@ async function load(forceCheck = false) {
         !data.updatedAt
       )
         continue;
-      if (run !== requested) return;
       if(panel && Date.parse(data.updatedAt)<Date.parse(panel.updatedAt)) continue;
       editionReadFailed=false;
       applyVerifiedPressLocations(data);
@@ -1995,7 +2000,6 @@ async function load(forceCheck = false) {
       return;
     } catch {}
   }
-  if (run !== requested) return;
   editionReadFailed=true;
   if (panel) {showEditionTime(true);syncLayer();renderItems();}
   else {
