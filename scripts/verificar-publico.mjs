@@ -110,7 +110,8 @@ function checkExplanations(p, issues) {
   for (const [id,n] of Object.entries(e.notices)) {
     const source = mapped.get(id);
     if (!source || source.kind !== 'oficial' || source.withdrawnAt || !n ||
-        !['ia','fuentes'].includes(n.mode) || !/^[a-f0-9]{64}$/.test(n.signature) ||
+        !['ia','fuentes'].includes(n.mode) || (n.method != null && (n.mode !== 'ia' ||
+          !['seleccion','redaccion'].includes(n.method))) || !/^[a-f0-9]{64}$/.test(n.signature) ||
         !isTimestamp(n.generatedAt) || Date.parse(n.generatedAt) > Date.parse(p.updatedAt) + 60000 ||
         [n.what,n.meaning].some(t => !isText(t) || t.length > 700 || /[<>]/.test(t))) {
       issues.push('Explicaciones · ficha sin respaldo oficial o texto inválido'); continue;

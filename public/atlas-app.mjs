@@ -1588,13 +1588,7 @@ async function load() {
       if (run !== requested) return;
       mappedItems = layerRecords(data.items);
       panel = data;
-      const age = Date.now() - Date.parse(panel.updatedAt);
-      $("snapshotTime").textContent =
-        (age > 2 * 3600000
-          ? "Último registro disponible: "
-          : "Actualización: ") +
-        dateTime(panel.updatedAt) +
-        " · hora de Perú";
+      showEditionTime();
       updateClimate();
       renderSources();
       renderItems();
@@ -1603,12 +1597,20 @@ async function load() {
       return;
     } catch {}
   }
-  if (!panel) {
+  if (run !== requested) return;
+  if (panel) showEditionTime(true);
+  else {
     $("snapshotTime").textContent =
       "No se pudo consultar el registro. Fuentes oficiales disponibles abajo.";
     renderSources();
     renderItems();
   }
+}
+function showEditionTime(failed = false) {
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(panel.updatedAt)) / 60000));
+  const status = failed ? " · no se pudo comprobar una edición más reciente" :
+    minutes >= 30 ? " · actualización demorada" : "";
+  $("snapshotTime").textContent = "Última edición del " + dateTime(panel.updatedAt) + " · hora de Perú" + status;
 }
 renderSources();
 createMap({
