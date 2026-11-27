@@ -130,6 +130,11 @@ function selectEdition() {
   if(lastProjection?.national===nationalEdition && lastProjection.rivers===riverSample && lastProjection.weather===weatherSample)return;
   const withRivers=withRiverReading(nationalEdition,riverSample);
   panel=withMeteorologicalReading(withRivers,weatherSample);
+  if(panel!==nationalEdition) {
+    const order=new Map(nationalEdition.items.map((item,index)=>[item.id,index]));
+    const time=item=>startOf(eventTime(item) || item.firstSeenAt) || 0;
+    panel.items.sort((a,b)=>time(b)-time(a) || (order.get(a.id) ?? order.size)-(order.get(b.id) ?? order.size));
+  }
   mappedItems=layerRecords(panel.items);
   lastProjection={national:nationalEdition,rivers:riverSample,weather:weatherSample};
 }
