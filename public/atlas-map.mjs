@@ -95,7 +95,7 @@ export const mapCities = labelData
   }));
 // Keep the camera in geographic coordinates. The overlay marks remain the same
 // size in screen pixels as the user moves between national and regional views.
-function createCamera(map, onDraw) {
+export function createCamera(map, onDraw) {
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const maxZoom = 130;
   let width,
@@ -104,6 +104,7 @@ function createCamera(map, onDraw) {
     home,
     state,
     goal,
+    framing,
     animation = 0;
   function draw(next) {
     const h = baseHeight / next.z,
@@ -122,10 +123,12 @@ function createCamera(map, onDraw) {
     cancelAnimationFrame(animation);
     animation = 0;
     goal = null;
+    framing = null;
   }
-  function move(next, animate = true) {
+  function move(next, animate = true, frame = null) {
     stop();
     goal = next;
+    framing = frame;
     if (!animate || reducedMotion.matches) {
       draw(next);
       return;
@@ -145,11 +148,22 @@ function createCamera(map, onDraw) {
     }
     animation = requestAnimationFrame(tick);
   }
+  function fitDestination({box,local}) {
+    const available = local ? 0.76 : 0.68;
+    const z = nearest(
+      Math.min(
+        (((baseHeight * width) / height) * available) / Math.max(0.015, box.width),
+        (baseHeight * 0.62) / Math.max(0.015, box.height),
+      ), 1.3, local ? maxZoom : 12,
+    );
+    return {x:box.x+box.width/2, y:box.y+box.height/2, z};
+  }
   function resize() {
     const box = map.getBoundingClientRect();
     if (!box.height || !box.width) return;
     if (width === box.width && height === box.height) return;
-    stop();
+    const frame = framing;
+    const target = animation ? goal : state;
     width = box.width;
     height = box.height;
     const ratio = width / height;
@@ -162,12 +176,15 @@ function createCamera(map, onDraw) {
       y: width < 761 ? 15 : 14.65,
       z: 1,
     };
-    draw(state?.z > 1.01 ? state : home);
+    // A rotation can arrive mid-flight. Refit the selected territory for the
+    // new aspect ratio; a user-controlled camera keeps its geographic center.
+    const destination = frame ? fitDestination(frame) : target?.z > 1.01 ? target : home;
+    move(destination, false, frame);
   }
   new ResizeObserver(resize).observe(map);
   resize();
   reducedMotion.addEventListener("change", () => {
-    if (animation && goal && reducedMotion.matches) move(goal, false);
+    if (animation && goal && reducedMotion.matches) move(goal, false, framing);
   });
   return {
     home: () => move(home),
@@ -187,18 +204,8 @@ function createCamera(map, onDraw) {
         move({ x: point.x, y: point.y, z: Math.min(state.z, 3) });
     },
     fit(box, local = false) {
-      // At wider widths the climate and region cards flank the open map.
-      const available = local ? 0.76 : 0.68;
-      const z = nearest(
-        Math.min(
-          (((baseHeight * width) / height) * available) /
-            Math.max(0.015, box.width),
-          (baseHeight * 0.62) / Math.max(0.015, box.height),
-        ),
-        1.3,
-        local ? maxZoom : 12,
-      );
-      move({ x: box.x + box.width / 2, y: box.y + box.height / 2, z });
+      const frame = {box,local};
+      move(fitDestination(frame), true, frame);
     },
   };
 }

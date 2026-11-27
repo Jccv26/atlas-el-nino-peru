@@ -12,7 +12,7 @@ import { fetchTemperature, isTemperatureSnapshot } from '../lib/temperatura.mjs'
 import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
 import { generateExplanations, explanationBatchMaxUsd } from '../lib/explicaciones.mjs';
 import { refreshPanorama, reuseDetail } from '../lib/panorama.mjs';
-import {materialize} from '../lib/radar-ahora.mjs';
+import {mergedRadar} from '../lib/radar-ahora.mjs';
 import {radarDescriptor,radarReadingItems,editionOriginalIndex} from '../lib/edicion-local.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
@@ -228,31 +228,6 @@ async function seedCurrentSlot(stateDir, panorama) {
   await writeFile(join(dir, filename), JSON.stringify(record), { mode: 0o600 });
 }
 const timestamp = date => Date.parse(date) || 0;
-
-function mergedRadar(seed,published,now) {
-  const readings=[seed,published].filter(r=>r?.schemaVersion===1 && Array.isArray(r.reports) &&
-    timestamp(r.checkedAt)>0 && timestamp(r.checkedAt)<=now).sort((a,b)=>timestamp(a.checkedAt)-timestamp(b.checkedAt));
-  if (!readings.length) return null;
-  const reports=new Map(), desks={};
-  for (const reading of readings) {
-    for (const desk of reading.coverage || []) {
-      const old=desks[desk.code];
-      if (!old || timestamp(desk.latestIssuedAt)>timestamp(old.latestIssuedAt) ||
-          (desk.latestIssuedAt===old.latestIssuedAt && desk.latestReportId>=old.latestReportId)) desks[desk.code]=desk;
-    }
-    for (const report of reading.reports) {
-      const slot=report.radar+'/'+report.issuedAt;
-      if (!reports.has(slot) || reports.get(slot).id<=report.id) reports.set(slot,report);
-    }
-  }
-  const current=[...reports.values()].filter(report=>{
-    const desk=desks[report.radar];
-    return !(desk?.latestIssuedAt===report.issuedAt && desk.latestReportId>report.id);
-  });
-  const newest=readings.at(-1);
-  const lastSuccessAt=readings.map(r=>r.lastSuccessAt).filter(d=>timestamp(d)>0 && timestamp(d)<=now).sort().at(-1) || null;
-  return materialize(current,new Date(now),{status:newest.status,checkedAt:newest.checkedAt,lastSuccessAt,desks});
-}
 
 function mergedImpacts(seed,published,now) {
   const readings=[seed,published].filter(r=>r?.schemaVersion===1 && Array.isArray(r.events) &&
