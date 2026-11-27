@@ -367,6 +367,15 @@ export async function publishCycle({
     const retryInput = {...previous,sources:previous.sources?.map(s =>
       ['stale','error'].includes(s.status) ? {...s,checkedAt:null} : s)};
     const snapshot = await (refresh ?? refreshPanorama)(retryInput,{now:new Date(now)});
+    const event = Number(process.env.GITHUB_RUN_ATTEMPT)>1 ? 'rerun' : process.env.GITHUB_EVENT_NAME;
+    if (process.env.GITHUB_ACTIONS === 'true' && ['push','workflow_dispatch','schedule','rerun'].includes(event) &&
+        /^\d+$/.test(process.env.GITHUB_RUN_ID ?? '')) {
+      snapshot.publication = {event, runId:process.env.GITHUB_RUN_ID};
+      const scheduled = event === 'schedule' && process.env.GITHUB_RUN_ATTEMPT === '1'
+        ? {at:snapshot.updatedAt, runId:process.env.GITHUB_RUN_ID}
+        : previous.publication?.lastScheduled;
+      if (scheduled) snapshot.publication.lastScheduled = scheduled;
+    }
     const temperaturePath = join(root, temperatureFile);
     try {
       const stored = await optionalFile(temperaturePath);

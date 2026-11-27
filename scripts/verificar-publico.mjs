@@ -156,6 +156,12 @@ function checkSnapshot(p, files, issues, notes) {
     issues.push('panorama · estructura, fuentes o fecha de actualización inválidas'); return;
   }
   const asOf = Date.parse(p.updatedAt);
+  if (p.publication) {
+    const {event,runId,lastScheduled} = p.publication;
+    if (!['push','workflow_dispatch','schedule','rerun'].includes(event) || !/^\d+$/.test(runId) ||
+        (lastScheduled && (!/^\d+$/.test(lastScheduled.runId) || !isTimestamp(lastScheduled.at) || Date.parse(lastScheduled.at)>asOf)))
+      issues.push('panorama · historial de actualización incoherente');
+  }
   if (asOf>Date.now()+5*60000) issues.push('panorama · actualización futura');
   if (Date.now()-asOf>2*3600000) notes.push('El panorama tiene más de dos horas. Consultar su hora de corte.');
   privateKeys(p,'panorama',issues);

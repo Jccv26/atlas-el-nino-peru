@@ -1309,6 +1309,18 @@ const fallbackSources = [
   ["SUTRAN", "https://alertasviales.sutran.gob.pe/"],
 ];
 function renderSources() {
+  const provenance = panel?.publication;
+  const triggers = {push:"un cambio publicado", workflow_dispatch:"una solicitud manual", schedule:"el horario de GitHub", rerun:"la repetición de una ejecución anterior"};
+  const state = $("publicationStatus");
+  state.hidden = !provenance || !Object.hasOwn(triggers, provenance.event);
+  if (!state.hidden) {
+    const history = "https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/atlas.yml?query=event%3Aschedule";
+    state.replaceChildren(document.createTextNode("Esta edición se inició por " + triggers[provenance.event] +
+      ". " + (provenance.lastScheduled?.at
+        ? "Última consulta iniciada por horario el " + dateTime(provenance.lastScheduled.at) + ". "
+        : "La primera consulta por horario está pendiente de verificación. ")),
+      link("Ver el registro de actualizaciones automáticas ↗", history));
+  }
   const sources =
     panel?.sources ||
     fallbackSources.map(([name, url]) => ({ name, url, status: "external" }));
