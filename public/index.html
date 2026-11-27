@@ -23,7 +23,7 @@
       crossorigin
     />
     <link rel="stylesheet" href="./atlas.css?v=2" />
-    <link rel="stylesheet" href="./mapa-interaccion.css?v=2" />
+    <link rel="stylesheet" href="./mapa-interaccion.css?v=3" />
   </head>
   <body>
     <a class="skip" href="#avisos">Saltar a los avisos</a>
@@ -183,27 +183,35 @@
           <div id="mapHint" class="map-hint">
             Selecciona una región para ver sus avisos
           </div>
-          <div id="regionCard" class="region-card" hidden>
+          <section
+            id="regionCard"
+            class="region-card"
+            aria-labelledby="regionTitle"
+            tabindex="-1"
+            hidden
+          >
             <button
               id="closeRegion"
               class="close"
               aria-label="Cerrar ficha regional"
             >
               ×</button
-            ><span class="eyebrow">Tu región</span>
+            ><span id="regionScope" class="eyebrow">Panorama regional</span>
             <h2 id="regionTitle"></h2>
             <p id="regionCount"></p>
-            <p id="regionPreviewLabel" class="preview-label" hidden>
-              Otros avisos oficiales de esta región
-            </p>
+            <h3 id="regionPreviewLabel" class="preview-label">
+              Qué está pasando
+            </h3>
             <div id="regionPreview" class="region-preview"></div>
-            <a href="#avisos" class="text-btn" id="regionGo"
-              >Ver avisos de la región <span aria-hidden="true">↓</span></a
-            >
-            <a href="#avisos" id="otherRegion" class="all-region" hidden
-              >Todos los temas de la región ↓</a
-            >
-          </div>
+            <div class="region-actions">
+              <a href="#avisos" class="text-btn" id="regionGo"
+                >Ver avisos de la región <span aria-hidden="true">↓</span></a
+              >
+              <a href="#avisos" id="otherRegion" class="all-region" hidden
+                >Todos los temas de la región ↓</a
+              >
+            </div>
+          </section>
         </div>
       </section>
       <section
@@ -265,9 +273,12 @@
             <select id="period" aria-label="Filtrar por vigencia">
               <option value="">Cualquier vigencia</option>
               <option value="vigente">Vigentes</option>
+              <option value="listado">En el listado de SENAMHI</option>
               <option value="proximo">Próximos</option>
               <option value="finalizado">Finalizados</option>
               <option value="actualizado">Sustituidos</option>
+              <option value="retirado">Retirados del listado</option>
+              <option value="sinconfirmar">Vigencia sin confirmar</option>
               <option value="publicado">Sin vigencia definida</option>
             </select>
           </div>
@@ -352,6 +363,6 @@
       <h2 id="dialogTitle"></h2>
       <div id="dialogBody"></div>
     </dialog>
-    <script src="./atlas-app.mjs?v=3" type="module"></script>
+    <script src="./atlas-app.mjs?v=4" type="module"></script>
   </body>
 </html>

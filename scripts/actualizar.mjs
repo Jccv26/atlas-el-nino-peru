@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {refreshPanorama} from '../lib/panorama.mjs';
+import {generateExplanations} from '../lib/explicaciones.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const publicDir = path.resolve(process.env.ATLAS_PUBLIC_DIR || path.join(root, 'public'));
@@ -45,6 +46,11 @@ export async function actualizar({force = false, ai = true, bulletin: buildBulle
       }
     } catch { console.error('No se pudo generar esta edición. Se conservan los avisos oficiales.'); }
   }
+  // Reuse the public edition locally. A single publisher owns the shared
+  // monthly budget for rewriting regional notices.
+  snapshot.explanations = await generateExplanations({
+    items:snapshot.items,sources:snapshot.sources,previous:previous.explanations,now:snapshot.updatedAt,useAI:false,
+  });
   await save(destination, snapshot);
   console.log(JSON.stringify({updatedAt:snapshot.updatedAt, sources:snapshot.sources.map(s=>[s.id,s.status,s.count??0]), bulletin: snapshot.bulletin?.id || null}));
   return snapshot;

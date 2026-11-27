@@ -1,4 +1,4 @@
-import { createMap } from "./atlas-map.mjs?v=2";
+import { createMap, mapCities } from "./atlas-map.mjs?v=3";
 import { layerRecords } from "./avisos-mapa.mjs";
 const $ = (id) => document.getElementById(id);
 const node = (tag, text = "", css = "") => {
@@ -51,11 +51,35 @@ function findRegion(name) {
     ) || ""
   );
 }
+function findCity(value, regionName = "") {
+  const name = fold(value)
+    .trim()
+    .replace(/\s*\(ciudad\)$/, "");
+  return mapCities.find(
+    (city) =>
+      fold(city.name) === name && (!regionName || city.region === regionName),
+  );
+}
+function namesCity(item, city) {
+  if (!city) return false;
+  const name = fold(city);
+  if (fold(item.locality).trim() === name) return true;
+  const title = fold(item.title);
+  return ["distrito de ", "ciudad de "].some((prefix) => {
+    const rest = title.split(prefix)[1];
+    return (
+      rest?.split(/(?:\s*[–—,:;()]|\s+-\s+|\s+en la provincia)/)[0].trim() ===
+      name
+    );
+  });
+}
 let panel = null,
   mappedItems = [],
   layer = "mar",
   feed = "oficial",
   region = "",
+  selectedCity = "",
+  localOnly = false,
   query = "",
   topic = "",
   period = "",
@@ -180,11 +204,23 @@ const periodNames = {
   finalizado: "Finalizado",
   publicado: "Sin vigencia definida",
   actualizado: "Sustituido",
+  listado: "En el listado de SENAMHI",
+  sinconfirmar: "Vigencia sin confirmar",
+  retirado: "Retirado del listado",
 };
 function validity(item, now = Date.now()) {
   if (item.supersededBy) return "actualizado";
+  if (item.withdrawnAt) return "retirado";
   const start = startOf(item.validFrom),
     end = ending(item.validUntil);
+  if (
+    item.sourceId === "senamhi-rios" &&
+    item.phisisListedAt &&
+    !item.validUntil
+  ) {
+    const age = now - startOf(item.phisisListedAt);
+    return age >= 0 && age <= 2 * 3600000 ? "listado" : "sinconfirmar";
+  }
   if (end < now) return "finalizado";
   if (start > now) return "proximo";
   if (start <= now && end >= now) return "vigente";
@@ -193,7 +229,7 @@ function validity(item, now = Date.now()) {
 function mapPeriod(item) {
   if (item.invalidValidity) return "";
   const state = validity(item);
-  if (state === "vigente") return "active";
+  if (state === "vigente" || state === "listado") return "active";
   if (state === "proximo") return "upcoming";
   const age = Date.now() - startOf(eventTime(item));
   return state === "publicado" && age >= 0 && age <= 72 * 3600000
@@ -251,10 +287,92 @@ function localContext(item) {
         : "")
   );
 }
+function simpleTitle(title) {
+  const words = String(title || "").trim();
+  return words && words === words.toUpperCase()
+    ? words[0]?.toUpperCase() + words.slice(1).toLocaleLowerCase("es-PE")
+    : words;
+}
+function explanationFor(item) {
+  const note = panel?.explanations?.notices?.[item.id];
+  if (note?.what && note.meaning && ["ia", "fuentes"].includes(note.mode))
+    return note;
+  let what = simpleTitle(item.phenomenon || item.title);
+  let meaning = "";
+  if (item.sourceId === "sunass") {
+    what = (item.summary || what).replace(/^Registro\s+[\d-]+\.\s*/i, "");
+    if (item.locality) what = item.locality + " · " + what;
+    if (item.validFrom)
+      meaning = "Inicio comunicado para el " + dateTime(item.validFrom) + ".";
+    if (item.expectedRestorationAt)
+      meaning +=
+        " Reposición prevista para el " +
+        dateTime(item.expectedRestorationAt) +
+        ".";
+  } else if (
+    topics(item).rios &&
+    (item.sourceId === "senamhi-rios" ||
+      item.originNotice?.sourceId === "senamhi-rios")
+  ) {
+    const station =
+      item.stationName ||
+      (item.title || "").match(/\bestación\s+([^()]+)$/i)?.[1] ||
+      item.locality;
+    const river = (item.title || "").match(
+      /\brío\s+(.+?)\s+[-–—]\s+estación/i,
+    )?.[1];
+    const placeName = (name) =>
+      String(name)
+        .trim()
+        .toLocaleLowerCase("es-PE")
+        .replace(
+          /(^|\s)(\p{L})/gu,
+          (all, boundary, letter) =>
+            boundary + letter.toLocaleUpperCase("es-PE"),
+        );
+    const level = item.level && String(item.level).toLocaleLowerCase("es-PE");
+    if (station)
+      what =
+        "SENAMHI midió el nivel del río" +
+        (river ? " " + placeName(river) : "") +
+        " en la estación " +
+        placeName(station) +
+        "." +
+        (level ? " El aviso indica umbral " + level + "." : "");
+    meaning =
+      "La medición describe el río en esa estación. La ficha oficial precisa qué poblados abarca el aviso.";
+  } else if (
+    item.sourceId === "senamhi-lluvias" ||
+    item.sourceId === "senamhi-quebradas"
+  ) {
+    what =
+      item.sourceId === "senamhi-lluvias"
+        ? "SENAMHI prevé lluvias intensas en sectores de la región."
+        : "SENAMHI advierte que algunas quebradas podrían activarse con las lluvias.";
+    meaning = "Consulta las zonas incluidas y la vigencia en el aviso.";
+  }
+  return { what, meaning: meaning.trim(), mode: "fuentes" };
+}
 function showRecord(item) {
   const fields = [
     node("p", item.sourceName || item.source || item.sourceId, "record-source"),
   ];
+  if (
+    item.kind === "oficial" &&
+    (panel?.explanations?.notices?.[item.id] || mapPeriod(item))
+  ) {
+    const note = explanationFor(item);
+    fields.push(node("h3", "En palabras sencillas"), node("p", note.what));
+    if (note.meaning) fields.push(node("p", note.meaning));
+    fields.push(
+      node(
+        "small",
+        note.mode === "ia"
+          ? "Explicación con IA basada en esta publicación."
+          : "Lectura de la publicación oficial.",
+      ),
+    );
+  }
   const dates = [
     item.forecastDate && "Pronóstico para el " + dateTime(item.forecastDate),
     item.publishedAt && "Publicado el " + dateTime(item.publishedAt),
@@ -264,6 +382,24 @@ function showRecord(item) {
       "Reposición prevista: " + dateTime(item.expectedRestorationAt),
   ].filter(Boolean);
   if (dates.length) fields.push(node("p", dates.join(" · ")));
+  if (item.phisisListedAt && !item.validUntil)
+    fields.push(
+      node(
+        "p",
+        "Última aparición verificada en el listado hidrológico de SENAMHI: " +
+          dateTime(item.phisisListedAt) +
+          ".",
+      ),
+    );
+  if (item.withdrawnAt)
+    fields.push(
+      node(
+        "p",
+        "El aviso dejó de figurar en el listado activo el " +
+          dateTime(item.withdrawnAt) +
+          ".",
+      ),
+    );
   if (item.invalidValidity)
     fields.push(
       node(
@@ -405,6 +541,7 @@ function renderItems() {
       (feed === "todos" ||
         (feed === "oficial" ? it.kind === "oficial" : it.kind !== "oficial")) &&
       (!region || inRegion(it, region)) &&
+      (!localOnly || namesCity(it, selectedCity)) &&
       (!topic || fromLayer || topics(it)[topic]) &&
       (!period || validity(it) === period) &&
       (!fromLayer || onLayer(it)) &&
@@ -426,7 +563,7 @@ function renderItems() {
     ? "Consulta regional"
     : "Consulta nacional";
   $("feedHeading").textContent = region
-    ? "Avisos de " + regionLabel(region)
+    ? "Avisos de " + (localOnly ? selectedCity : regionLabel(region))
     : "Avisos y reportes";
   $("listCount").textContent = panel
     ? list.length +
@@ -477,62 +614,176 @@ function renderItems() {
   $("more").hidden = list.length <= limit;
   $("queryState").hidden = !query;
   $("queryState").querySelector("span").textContent = "Búsqueda · " + query;
-  renderRegionCard(all);
+  renderRegionCard();
 }
 const layerNames = { mar: "Mar", lluvias: "Lluvias", rios: "Ríos" };
-function renderRegionCard(all) {
+function storyType(item) {
+  if (item.sourceId === "sunass") return "Agua potable";
+  if (item.sourceId === "marina") return "Oleaje";
+  return item.category || "Reporte";
+}
+function regionStory(item, scope) {
+  const note = explanationFor(item);
+  const story = node("article", "", "region-story");
+  const tag = storyType(item);
+  const state = validity(item);
+  const meta = node("div", "", "story-meta");
+  meta.append(node("span", scope || tag, "story-topic"));
+  if (scope) meta.append(node("span", tag));
+  if (state !== "publicado") meta.append(node("span", periodNames[state]));
+  story.append(meta, node("p", note.what, "story-what"));
+  if (note.meaning && fold(note.meaning) !== fold(note.what)) {
+    const meaning = node("p", "", "story-meaning");
+    meaning.append(
+      node("strong", "Qué significa"),
+      document.createTextNode(" · " + note.meaning),
+    );
+    story.append(meaning);
+  }
+  const tramos = item.coastalByRegion?.[region]
+    ?.map((s) => s.stretch)
+    .filter(Boolean);
+  const provinces = item.provincesByRegion?.[region];
+  if (tramos?.length)
+    story.append(
+      node("p", "Tramo del litoral: " + tramos.join(" · "), "story-area"),
+    );
+  else if (provinces?.length) {
+    const extra = provinces.length - 3;
+    story.append(
+      node(
+        "p",
+        "Provincias incluidas: " +
+          provinces.slice(0, 3).join(", ") +
+          (extra > 0 ? " y " + extra + " más." : "."),
+        "story-area",
+      ),
+    );
+  }
+  const button = node("button", "", "preview-link story-source");
+  button.type = "button";
+  const time = eventTime(item);
+  const source = item.sourceName || item.source || "Fuente oficial";
+  button.textContent =
+    [source, time && dateTime(time)].filter(Boolean).join(" · ") + " ›";
+  button.setAttribute(
+    "aria-label",
+    "Ver ficha y fuente de " + source + ". " + item.title,
+  );
+  button.onclick = () => showRecord(item);
+  const credit = node(
+    "small",
+    note.mode === "ia" ? "Explicación con IA" : "Según la fuente",
+    "story-credit",
+  );
+  story.append(button, credit);
+  return story;
+}
+function renderRegionCard() {
   $("regionCard").hidden = !region;
   $("mapHint").hidden = !!region;
   $("mapFrame").classList.toggle("has-region", Boolean(region));
   if (!region) return;
-  const official = all.filter(
-    (it) => it.kind === "oficial" && inRegion(it, region),
+  const official = mappedItems.filter(
+    (it) =>
+      it.kind === "oficial" &&
+      inRegion(it, region) &&
+      mapPeriod(it) &&
+      !(
+        it.expectedRestorationAt &&
+        ending(it.expectedRestorationAt) < Date.now()
+      ),
   );
-  const relevant = mappedItems.filter(
-    (it) => inRegion(it, region) && onLayer(it),
-  );
-  const previews = (
-    layer === "mar" && !relevant.length ? official : relevant
-  ).slice(0, 2);
-  $("regionTitle").textContent = regionLabel(region);
-  const coverage =
-    relevant.length +
-    (relevant.length === 1 ? " publicación" : " publicaciones") +
-    " de " +
-    (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase());
-  $("regionCount").textContent = panel
-    ? coverage + " con ámbito identificado"
-    : "Consultando los avisos oficiales…";
-  $("regionPreviewLabel").hidden = !(previews.length && !relevant.length);
-  $("regionPreview").replaceChildren(
-    ...previews.map((it) => {
-      const b = node("button", "", "preview-link");
-      const coast = it.coastalByRegion?.[region];
-      const details = [
-        it.source || it.sourceName,
-        validity(it) === "publicado" ? "" : periodNames[validity(it)],
-        levelFor(it, region),
-      ].filter(Boolean);
-      b.append(
-        node("small", details.join(" · ")),
+  const relevant = official.filter(onLayer);
+  const general = layer === "mar" && !relevant.length;
+  const candidates = general ? official : relevant;
+  const ids =
+    panel?.explanations?.regions?.[region]?.[general ? "general" : layer] || [];
+  const byId = new Map(candidates.map((item) => [item.id, item]));
+  const ranked = [
+    ...new Set([
+      ...ids.map((id) => byId.get(id)).filter(Boolean),
+      ...candidates,
+    ]),
+  ];
+  const direct = selectedCity
+    ? ranked.filter((item) => namesCity(item, selectedCity))
+    : [];
+  const first = direct[0] || ranked[0];
+  const others = ranked.filter((item) => item !== first);
+  // A second type of event adds context when the region has many similar station reports.
+  const second =
+    (selectedCity &&
+      direct.length &&
+      others.find(
+        (item) =>
+          !direct.includes(item) && storyType(item) !== storyType(first),
+      )) ||
+    others.find((item) => storyType(item) !== storyType(first)) ||
+    others[0];
+  $("regionScope").textContent = selectedCity
+    ? "Ciudad · " + regionLabel(region)
+    : general
+      ? "Panorama regional"
+      : "Región · " + layerNames[layer];
+  $("regionTitle").textContent = selectedCity || regionLabel(region);
+  $("regionCount").textContent = !panel
+    ? "Consultando publicaciones oficiales…"
+    : (general
+        ? "Avisos regionales"
+        : relevant.length +
+          (relevant.length === 1 ? " publicación" : " publicaciones") +
+          " de " +
+          (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase())) +
+      " · Corte del " +
+      dateTime(panel.updatedAt);
+  const preview = $("regionPreview");
+  preview.replaceChildren();
+  $("regionPreviewLabel").hidden = !panel;
+  if (panel) {
+    if (selectedCity && !direct.length && ranked.length)
+      preview.append(
         node(
-          "span",
-          coast?.length
-            ? coast.map((seg) => seg.stretch).join(" · ")
-            : it.title,
+          "p",
+          "Los avisos disponibles para esta consulta corresponden al ámbito regional de " +
+            regionLabel(region) +
+            ".",
+          "brief-empty",
         ),
       );
-      b.onclick = () => showRecord(it);
-      return b;
-    }),
-  );
-  $("regionGo").textContent = relevant.length
-    ? "Ver avisos de " +
-      (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase()) +
-      " ↓"
-    : "Ver avisos de " + regionLabel(region) + " ↓";
-  $("otherRegion").hidden = !relevant.length;
+    for (const item of [first, second].filter(Boolean)) {
+      const scope = selectedCity
+        ? direct.includes(item)
+          ? "En " + selectedCity
+          : "En la región " + regionLabel(region)
+        : "";
+      preview.append(regionStory(item, scope));
+    }
+    if (!first)
+      preview.append(
+        node(
+          "p",
+          "En el último corte no encontramos avisos vigentes, próximos o recientes " +
+            (general
+              ? "para "
+              : "de " + layerNames[layer].toLowerCase() + " para ") +
+            regionLabel(region) +
+            ".",
+          "brief-empty",
+        ),
+      );
+  }
+  const goToLocal = Boolean(selectedCity && direct.length);
+  $("regionGo").textContent = goToLocal
+    ? "Ver avisos de " + selectedCity + " ↓"
+    : relevant.length
+      ? "Ver avisos de " +
+        (layer === "mar" ? "oleaje" : layerNames[layer].toLowerCase()) +
+        " ↓"
+      : "Ver avisos de " + regionLabel(region) + " ↓";
+  $("otherRegion").hidden = !(relevant.length || goToLocal);
   $("otherRegion").onclick = () => {
+    localOnly = false;
     topic = "";
     period = "";
     query = "";
@@ -541,14 +792,13 @@ function renderRegionCard(all) {
     changed();
   };
   $("regionGo").onclick = () => {
+    localOnly = goToLocal;
     query = "";
     period = "";
     feed = "oficial";
     fromLayer = relevant.length > 0;
     topic = fromLayer ? layer : "";
-    syncControls();
-    renderItems();
-    saveLocation();
+    changed();
   };
 }
 function syncLayer() {
@@ -575,7 +825,7 @@ function syncLayer() {
     regionTotals,
     regionStatus,
   });
-  map?.select(region);
+  map?.select(region, selectedCity);
   document.querySelectorAll("[data-layer]").forEach((b) => {
     const enable = b.dataset.layer === layer;
     b.classList.toggle("selected", enable);
@@ -606,6 +856,46 @@ function syncLayer() {
   if (delayed.length) $("coverageText").textContent += " · lectura parcial";
   $("coverageText").disabled = !panel;
   $("coverageText").onclick = () => {
+    const water =
+      layer === "rios" &&
+      panel?.sources.find((source) => source.id === "senamhi-rios");
+    const audit = water?.coverageAudit;
+    const verification = [];
+    if (Array.isArray(audit?.listed) && audit.asOf && safeUrl(audit.url)) {
+      const count = audit.listed.length;
+      const additions = (audit.additionalSinceCutoff || []).map((id) =>
+        String(id).split("-").at(-1),
+      );
+      verification.push(
+        node("h3", "Cruce con el parte nacional de ríos"),
+        node(
+          "p",
+          "El parte del COEN del " +
+            dateTime(audit.asOf) +
+            " consignó " +
+            count +
+            (count === 1 ? " aviso de SENAMHI." : " avisos de SENAMHI.") +
+            " Una región puede reunir varias estaciones." +
+            (additions.length
+              ? " Después de ese corte se identificaron otros avisos: " +
+                additions.join(", ") +
+                "."
+              : ""),
+        ),
+      );
+      if (audit.rosterOnly?.length)
+        verification.push(
+          node(
+            "p",
+            "Avisos respaldados por el cuadro nacional pendientes de contraste con la ficha individual: " +
+              audit.rosterOnly
+                .map((id) => String(id).split("-").at(-1))
+                .join(", ") +
+              ".",
+          ),
+        );
+      verification.push(link("Ver el cuadro de ríos del COEN ↗", audit.url));
+    }
     const rows = node("div", "", "coverage-list");
     for (const name of [...counts.keys()].sort((a, b) =>
       a.localeCompare(b, "es"),
@@ -661,6 +951,7 @@ function syncLayer() {
       "Cobertura de la capa " + layerNames[layer],
       counts.size ? "Regiones con avisos" : "Sin ámbito regional identificado",
       node("p", why),
+      ...verification,
       node(
         "p",
         "La vista nacional distingue 26 ámbitos. Lima Provincias, Lima Metropolitana y el Callao se pueden consultar por separado.",
@@ -761,10 +1052,10 @@ $("mapDetails").onclick = () => {
 };
 function syncControls() {
   $("regionSelect").value = region;
-  $("mapRegion").value = region;
+  $("mapRegion").value = selectedCity ? "ciudad:" + selectedCity : region;
   $("topic").value = topic;
   $("period").value = period;
-  $("searchInput").value = query;
+  $("searchInput").value = query || selectedCity;
   for (const b of document.querySelectorAll("[data-feed]")) {
     const yes = b.dataset.feed === feed;
     b.classList.toggle("selected", yes);
@@ -775,6 +1066,8 @@ function saveLocation() {
   const url = new URL(location.href);
   const fields = {
     region,
+    ciudad: selectedCity,
+    local: localOnly ? "1" : "",
     capa: layer === "mar" ? "" : layer,
     tema: topic,
     tipo: feed === "oficial" ? "" : feed,
@@ -800,7 +1093,9 @@ function selectedMapTopic() {
     ? layer
     : "";
 }
-function setRegion(name, viaMap = false) {
+function setRegion(name, viaMap = false, city = "") {
+  selectedCity = findCity(city, name)?.name || "";
+  localOnly = false;
   region = knownRegions.includes(name) ? name : "";
   if (viaMap) {
     feed = "oficial";
@@ -810,10 +1105,19 @@ function setRegion(name, viaMap = false) {
     fromLayer = Boolean(topic);
   }
   changed();
+  if (viaMap && name && matchMedia("(max-width: 760px)").matches)
+    requestAnimationFrame(() => {
+      if ($("regionCard").getBoundingClientRect().top > innerHeight * 0.65)
+        $("regionCard").scrollIntoView({ block: "start" });
+    });
 }
 $("closeRegion").onclick = () => setRegion("", true);
 $("regionSelect").onchange = (e) => setRegion(e.target.value);
-$("mapRegion").onchange = (e) => setRegion(e.target.value, true);
+$("mapRegion").onchange = (e) => {
+  const value = e.target.value;
+  const city = value.startsWith("ciudad:") && findCity(value.slice(7));
+  setRegion(city ? city.region : value, true, city ? city.name : "");
+};
 $("topic").onchange = (e) => {
   topic = e.target.value;
   fromLayer = false;
@@ -827,6 +1131,7 @@ document.querySelectorAll("[data-layer]").forEach(
   (b) =>
     (b.onclick = () => {
       layer = b.dataset.layer;
+      localOnly = false;
       topic = selectedMapTopic();
       fromLayer = Boolean(topic);
       period = "";
@@ -845,6 +1150,8 @@ document.querySelectorAll("[data-feed]").forEach(
 );
 $("clearFilters").onclick = () => {
   query = "";
+  selectedCity = "";
+  localOnly = false;
   region = "";
   feed = "oficial";
   topic = "";
@@ -867,12 +1174,21 @@ $("searchForm").onsubmit = (e) => {
   e.preventDefault();
   const q = $("searchInput").value.trim().slice(0, 100);
   const match = findRegion(q);
-  query = match ? "" : q;
+  const city = !match && findCity(q);
+  query = match || city ? "" : q;
   topic = "";
   fromLayer = false;
   period = "";
   feed = "oficial";
-  setRegion(match || "");
+  setRegion(match || city?.region || "", false, city?.name);
+  if (city || match) {
+    const locationForMap = new URL(location.href);
+    locationForMap.hash = "inicio";
+    window.history.replaceState(null, "", locationForMap);
+    $("regionCard").scrollIntoView({ block: "nearest" });
+    $("regionCard").focus({ preventScroll: true });
+    return;
+  }
   if (location.hash !== "#avisos") location.hash = "avisos";
   else $("avisos").scrollIntoView();
 };
@@ -887,9 +1203,26 @@ for (const n of knownRegions) {
   $("mapRegion").append(new Option(regionLabel(n), n));
   $("places").append(new Option(regionLabel(n), regionLabel(n)));
 }
+const cityOptions = document.createElement("optgroup");
+cityOptions.label = "Ciudades del mapa";
+for (const city of mapCities) {
+  cityOptions.append(
+    new Option(
+      city.name + " · " + regionLabel(city.region),
+      "ciudad:" + city.name,
+    ),
+  );
+  const text = findRegion(city.name) ? city.name + " (ciudad)" : city.name;
+  $("places").append(new Option(text, text));
+}
+$("mapRegion").append(cityOptions);
 function restoreLocation() {
   const q = new URLSearchParams(location.search);
   region = findRegion(q.get("region"));
+  const city = findCity(q.get("ciudad"), region);
+  selectedCity = city?.name || "";
+  if (city) region = city.region;
+  localOnly = Boolean(city && q.get("local") === "1");
   layer = ["rios", "lluvias"].includes(q.get("capa")) ? q.get("capa") : "mar";
   feed = ["todos", "prensa"].includes(q.get("tipo"))
     ? q.get("tipo")
@@ -944,6 +1277,20 @@ function renderSources() {
       );
       if (s.lastSuccessAt)
         d.append(node("small", "Última lectura: " + dateTime(s.lastSuccessAt)));
+      if (s.readChannel === "phisis" || s.readChannel === "web+phisis") {
+        d.append(
+          node(
+            "small",
+            s.readChannel === "phisis"
+              ? "Lectura recuperada en el listado hidrológico PHISIS de SENAMHI."
+              : "Canales oficiales consultados: portal de avisos y listado hidrológico PHISIS de SENAMHI.",
+          ),
+          link(
+            "Abrir visor hidrológico PHISIS ↗",
+            "https://www.senamhi.gob.pe/mapas/mapa-aviso-hidro/mapa-aviso-hidro.php",
+          ),
+        );
+      }
       if ((s.status === "error" || s.status === "stale") && s.checkedAt)
         d.append(node("small", "Intento: " + dateTime(s.checkedAt)));
       return d;
@@ -1246,7 +1593,7 @@ async function load() {
 }
 renderSources();
 createMap({
-  onRegion: (name) => setRegion(name, true),
+  onRegion: (name, city) => setRegion(name, true, city),
   onOceanReady: (t, s, product) => {
     oceanProduct = product;
     oceanTime = t;

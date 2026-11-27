@@ -292,3 +292,126 @@
   vector-effect: non-scaling-stroke;
   stroke-width: 0.6px;
 }
+
+#mapLabels .map-city {
+  pointer-events: bounding-box;
+  cursor: pointer;
+}
+#mapLabels .map-city > * {
+  pointer-events: visiblePainted;
+}
+#mapLabels .map-city:hover text,
+#mapLabels .map-city:focus-visible text {
+  fill: #a6fff0;
+}
+.region-card {
+  width: clamp(290px, 27vw, 390px);
+  max-width: none;
+  max-height: calc(100% - 106px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #507572 transparent;
+  scroll-margin-top: calc(var(--mast-height) + 6px);
+}
+.region-card h2 {
+  margin-right: 24px;
+}
+.region-card #regionCount {
+  color: #aec7c5;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.region-card .preview-label {
+  margin: 12px 0 6px;
+  color: #edf8f4;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.region-story {
+  min-width: 0;
+  padding: 10px 0 9px;
+  border-top: 1px solid #385355;
+}
+.region-story .story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  color: #bdd0cd;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.story-topic {
+  color: #96e4cd;
+  font-weight: 650;
+}
+.region-card .story-what {
+  margin: 5px 0 3px;
+  color: #f4faf7;
+  font-size: 15px;
+  font-weight: 560;
+  line-height: 1.4;
+}
+.region-card .story-meaning,
+.region-card .brief-empty {
+  margin: 4px 0;
+  color: #c8dcd7;
+  line-height: 1.48;
+  font-size: 13px;
+}
+.region-story .preview-link.story-source {
+  display: inline-block;
+  width: auto;
+  margin: 4px 8px 2px 0;
+  padding: 3px 0;
+  border: 0;
+  color: #9de9d9;
+  font-size: 11px;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.story-credit {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #b8cbc8;
+}
+.status-listado {
+  color: #adf1d4;
+}
+@media (min-width: 761px) {
+  .map-frame.has-region {
+    height: clamp(530px, 78vh, 800px);
+  }
+  .region-card .region-actions {
+    position: sticky;
+    bottom: -16px;
+    margin: 0 -16px -16px;
+    padding: 0 16px 12px;
+    background: #0b222a;
+  }
+  .has-region .map-tools {
+    right: calc(var(--edge) + clamp(290px, 27vw, 390px) + 12px);
+  }
+}
+@media (max-width: 760px) {
+  .map-frame.has-region .region-card:not([hidden]) {
+    padding: 16px var(--edge) 20px;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+  .region-card #regionScope {
+    display: block;
+    font-size: 10px;
+  }
+  .region-card h2 {
+    margin: 5px 0;
+  }
+  .region-card .preview-label {
+    margin-top: 14px;
+  }
+}

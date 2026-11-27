@@ -4,9 +4,11 @@ import {isIP} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {officialSources} from '../lib/oficiales.mjs';
+import {isPhisisRiverEvidence} from '../lib/rios-phisis.mjs';
 import {mediaSources} from '../lib/medios.mjs';
 import {pii} from '../lib/privacidad.mjs';
 import {isTemperatureSnapshot} from '../lib/temperatura.mjs';
+import {layerRecords} from '../public/avisos-mapa.mjs';
 
 const registry = new Map([...officialSources, ...mediaSources].map(s => [s.id, s]));
 const issuerIds = new Set(officialSources.map(s => s.id));
@@ -96,6 +98,39 @@ function checkCoenDocument(item, asOf, where, issues) {
   }
 }
 
+function checkExplanations(p, issues) {
+  const e = p.explanations;
+  if (e === undefined) return; // An earlier published edition can seed a new run.
+  if (e?.schemaVersion !== 1 || !isTimestamp(e.updatedAt) ||
+      !e.notices || !e.regions || typeof e.notices !== 'object' || typeof e.regions !== 'object' ||
+      Array.isArray(e.notices) || Array.isArray(e.regions)) {
+    issues.push('Explicaciones · formato inválido'); return;
+  }
+  const mapped = new Map(layerRecords(p.items).map(i => [i.id,i]));
+  for (const [id,n] of Object.entries(e.notices)) {
+    const source = mapped.get(id);
+    if (!source || source.kind !== 'oficial' || source.withdrawnAt || !n ||
+        !['ia','fuentes'].includes(n.mode) || !/^[a-f0-9]{64}$/.test(n.signature) ||
+        !isTimestamp(n.generatedAt) || Date.parse(n.generatedAt) > Date.parse(p.updatedAt) + 60000 ||
+        [n.what,n.meaning].some(t => !isText(t) || t.length > 700 || /[<>]/.test(t))) {
+      issues.push('Explicaciones · ficha sin respaldo oficial o texto inválido'); continue;
+    }
+    checkPrivacy(n,['what','meaning'],'explicación regional',issues);
+  }
+  for (const [area,groups] of Object.entries(e.regions)) {
+    if (!groups || typeof groups !== 'object' || Array.isArray(groups)) {
+      issues.push('Explicaciones · índice regional inválido'); continue;
+    }
+    for (const [topic,ids] of Object.entries(groups)) {
+      if (!['general','lluvias','rios','mar','agua'].includes(topic) || !Array.isArray(ids) ||
+          ids.length !== new Set(ids).size || ids.some(id => {
+            const it = mapped.get(id);
+            return !Object.hasOwn(e.notices,id) || ![...(it?.regions ?? []),...(it?.coastalRegions ?? [])].includes(area);
+          })) issues.push('Explicaciones · referencia fuera de su región');
+    }
+  }
+}
+
 function checkSnapshot(p, files, issues, notes) {
   if (!p || typeof p!=='object' || ![1,2].includes(p.schemaVersion) || !isTimestamp(p.updatedAt) || !Array.isArray(p.sources) || !p.sources.length || !Array.isArray(p.items)) {
     issues.push('panorama · estructura, fuentes o fecha de actualización inválidas'); return;
@@ -135,7 +170,15 @@ function checkSnapshot(p, files, issues, notes) {
     checkPrivacy(it,['title','summary','locality','region'],where,issues);
     checkCoenDocument(it,asOf,where,issues);
     if(it.supersededBy && (!isText(it.supersededBy) || !publicUrl(it.supersededUrl,new URL(registry.get(it.sourceId).url).hostname))) issues.push(where+' · actualización sin referencia del emisor');
-    for (const u of it.coverageUrls ?? []) if (it.kind!=='oficial' || !publicUrl(u,new URL(registry.get(it.sourceId).url).hostname)) issues.push(where+' · visor territorial con origen inválido');
+    for (const u of it.coverageUrls ?? []) {
+      const issuer = publicUrl(u,new URL(registry.get(it.sourceId).url).hostname);
+      if (it.kind!=='oficial' || !(issuer || (it.sourceId==='senamhi-rios' && isPhisisRiverEvidence(u)))) issues.push(where+' · visor territorial con origen inválido');
+    }
+    if (it.sourceId==='senamhi-rios') {
+      for (const key of ['observedAt','phisisListedAt','withdrawnAt'])
+        if (it[key]!=null && (!isTimestamp(it[key]) || Date.parse(it[key])>asOf+600000)) issues.push(where+' · hora hidrológica inválida');
+      checkPrivacy(it,['stationName','stationProvince','stationDistrict'],where,issues);
+    }
     for (const part of it.coastalScope ?? []) {
       checkPrivacy(part,['zone','stretch'],where,issues);
       for (const line of part.conditions ?? []) checkPrivacy({line},['line'],where,issues);
@@ -149,6 +192,7 @@ function checkSnapshot(p, files, issues, notes) {
   if(!declared.has('coen') || !declared.has('enfen')) issues.push('panorama · faltan las fuentes de referencia COEN/ENFEN');
   if(declared.get('enfen')?.status==='ok' && !p.items.some(i=>i?.sourceId==='enfen' && /comunicado oficial/i.test(i.title) && isTimestamp(i.publishedAt))) issues.push('ENFEN · lectura marcada exitosa sin comunicado oficial fechado');
   if(!p.items.some(it=>it && issuerIds.has(it.sourceId)&&isTimestamp(declared.get(it.sourceId)?.lastSuccessAt))) issues.push('panorama · ningún registro oficial con una fuente verificada');
+  checkExplanations(p,issues);
   const b=p.bulletin;
   if(!b)return;
   if(!isText(b.text)||!isTimestamp(b.generatedAt)||!Array.isArray(b.sources)||!b.sources.length) {issues.push('boletín · falta texto, fecha o referencias');return;}

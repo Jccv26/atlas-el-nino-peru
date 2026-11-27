@@ -77,12 +77,20 @@ const labelData = [
   ["BOLIVIA", -65.4, -16, 0.37, "country"],
   ["COLOMBIA", -71, 1.4, 0.36, "country"],
   ["PERÚ", -74.6, -8.5, 0.58, "nation"],
-  ["Piura", -80.62, -5.2, 0.34, "city"],
-  ["Iquitos", -73.25, -3.75, 0.34, "city"],
-  ["Lima", -77.04, -12.05, 0.36, "city"],
-  ["Cusco", -71.97, -13.53, 0.32, "city"],
-  ["Arequipa", -71.54, -16.4, 0.31, "city"],
+  ["Piura", -80.62, -5.2, 0.34, "city", "Piura"],
+  ["Iquitos", -73.25, -3.75, 0.34, "city", "Loreto"],
+  ["Lima", -77.04, -12.05, 0.36, "city", "Lima Metropolitana"],
+  ["Cusco", -71.97, -13.53, 0.32, "city", "Cusco"],
+  ["Arequipa", -71.54, -16.4, 0.31, "city", "Arequipa"],
 ];
+export const mapCities = labelData
+  .filter((label) => label[4] === "city")
+  .map(([name, lon, lat, , , region]) => ({
+    name,
+    region,
+    x: lon + 105,
+    y: 6 - lat,
+  }));
 // Keep the camera in geographic coordinates. The overlay marks remain the same
 // size in screen pixels as the user moves between national and regional views.
 function createCamera(map, onDraw) {
@@ -241,9 +249,9 @@ function regionPicker(frame, names, choose) {
   arrow.className = "atlas-chevron";
   arrow.setAttribute("aria-hidden", "true");
   wrap.replaceChildren(icon, visible, arrow, select);
-  return (name) => {
-    select.value = name;
-    visible.textContent = regionLabel(name) || "Explorar regiones";
+  return (name, city) => {
+    select.value = city ? "ciudad:" + city : name;
+    visible.textContent = city || regionLabel(name) || "Explorar regiones";
   };
 }
 
@@ -349,9 +357,21 @@ export async function createMap({ onRegion, onOceanReady }) {
     regions.set(r.name, path);
     anchors.set(r.name, regionAnchor(path));
   });
-  labelData.forEach(([label, lon, lat, size, kind]) => {
+  labelData.forEach(([label, lon, lat, size, kind, region]) => {
+    const group =
+      kind === "city"
+        ? svg("g", {
+            class: "map-city",
+            "data-city": label,
+            "data-region": region,
+            role: "button",
+            tabindex: "0",
+            "aria-label": "Ciudad de " + label + ", " + regionLabel(region),
+            "aria-controls": "regionCard",
+          })
+        : $("mapLabels");
     if (kind === "city")
-      $("mapLabels").append(
+      group.append(
         svg("circle", {
           cx: lon + 105,
           cy: 6 - lat,
@@ -387,10 +407,13 @@ export async function createMap({ onRegion, onOceanReady }) {
       t.style.opacity = ".82";
     }
     t.textContent = label;
-    $("mapLabels").append(t);
+    if (kind !== "city") t.setAttribute("aria-hidden", "true");
+    group.append(t);
+    if (kind === "city") $("mapLabels").append(group);
   });
   $("mapLabels").setAttribute("pointer-events", "none");
-  $("mapLabels").setAttribute("aria-hidden", "true");
+  $("mapLabels").setAttribute("role", "group");
+  $("mapLabels").setAttribute("aria-label", "Ciudades del mapa");
   const art = svg("g", { class: "atlas-annotations", "aria-hidden": "true" });
   $("mapWorld").append(art);
   const outline = svg("path", { class: "atlas-outline", visibility: "hidden" });
@@ -468,6 +491,7 @@ export async function createMap({ onRegion, onOceanReady }) {
   frame.append(announce);
   const updatePicker = regionPicker(frame, names, onRegion);
   let selected = "",
+    selectedCity = "",
     hover = "",
     tabRegion = names[0],
     layer = "mar",
@@ -495,7 +519,12 @@ export async function createMap({ onRegion, onOceanReady }) {
       // Hiding the entire group also removes its larger transparent touch target.
       group.style.display = !selected && bounds.width / unit < 35 ? "" : "none";
     });
-    if (selected) pin(marker, anchors.get(selected));
+    if (selected)
+      pin(
+        marker,
+        mapCities.find((city) => city.name === selectedCity) ||
+          anchors.get(selected),
+      );
     if (sample) pin(sampleMark, sample);
     map.style.setProperty("--atlas-pixel", unit + "px");
     if (keyboardRegion) focusTip(keyboardRegion);
@@ -609,9 +638,9 @@ export async function createMap({ onRegion, onOceanReady }) {
     tabRegion = name;
     regions.get(tabRegion).setAttribute("tabindex", "0");
   }
-  function select(name) {
+  function select(name, city = "") {
     if (name && !regions.has(name)) return;
-    if (name === selected) return;
+    if (name === selected && city === selectedCity) return;
     hideTip();
     if (selected) {
       const previous = regions.get(selected);
@@ -619,9 +648,10 @@ export async function createMap({ onRegion, onOceanReady }) {
       previous.setAttribute("aria-pressed", "false");
     }
     selected = name;
+    selectedCity = city;
     keyboardRegion = "";
     frame.classList.toggle("atlas-region-open", Boolean(name));
-    updatePicker?.(name);
+    updatePicker?.(name, city);
     outline.setAttribute("visibility", name ? "visible" : "hidden");
     marker.setAttribute("visibility", name ? "visible" : "hidden");
     if (name) {
@@ -630,7 +660,7 @@ export async function createMap({ onRegion, onOceanReady }) {
       path.classList.add("focused");
       path.setAttribute("aria-pressed", "true");
       outline.setAttribute("d", path.getAttribute("d"));
-      markerText.textContent = regionLabel(name);
+      markerText.textContent = city || regionLabel(name);
       paintMarks(unit);
       camera.fit(path.getBBox());
       announce.textContent =
@@ -683,6 +713,12 @@ export async function createMap({ onRegion, onOceanReady }) {
     hideTip();
   });
   map.addEventListener("keydown", (e) => {
+    const city = e.target.closest("[data-city]")?.dataset;
+    if (city && ["Enter", " "].includes(e.key)) {
+      e.preventDefault();
+      onRegion(city.region, city.city);
+      return;
+    }
     const name = e.target.closest(".region-path")?.dataset.region;
     if (!name || e.metaKey || e.ctrlKey || e.altKey) return;
     if (
@@ -772,10 +808,11 @@ export async function createMap({ onRegion, onOceanReady }) {
       skipClick = false;
       return;
     }
-    const name = e.target.closest("[data-region]")?.dataset.region;
+    const target = e.target.closest("[data-region]")?.dataset;
+    const name = target?.region;
     if (name) {
       hideTip();
-      onRegion(name);
+      onRegion(name, target.city);
     } else inspect(e, true);
   });
   let oceanRequest = null;

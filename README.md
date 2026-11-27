@@ -29,6 +29,10 @@ El publicador consulta también los PDF de lluvias intensas, quebradas, ríos y 
 
 Los boletines de las 07:00, 13:00 y 19:00 de Perú se preparan en la primera ejecución disponible del turno. La IA selecciona publicaciones oficiales. El publicador contrasta el guion con la transcripción antes de guardar la narración. Si la voz no se puede verificar, la edición sigue disponible en texto. Las solicitudes a OpenAI se realizan en el publicador. El archivo de audio se genera por edición y se comparte entre visitantes.
 
+Al seleccionar una región, la ficha explica el hecho y su significado en castellano cotidiano. El publicador extrae lugares, mediciones, fechas y niveles del documento oficial. OpenAI reformula su significado. Una ficha que conserva la lectura preparada a partir de la fuente lleva su propia atribución. Las explicaciones se reutilizan mientras siga vigente la misma información. La selección de una ciudad distingue los avisos que la mencionan de los de otras localidades de su región.
+
+La publicación en la nube reserva hasta un centavo de dólar por lote regional antes de solicitarlo a la API. Estas reservas tienen un máximo de seis dólares al mes dentro del límite conjunto del piloto. Abrir la web o consultar otra región utiliza la copia pública de la explicación.
+
 ### Operación de las claves
 
 Configurar `OPENAI_API_KEY` y `ATLAS_STATE_KEY` como secretos de Actions. La segunda clave protege el estado privado del publicador y sus reservas de consumo. Nunca colocar archivos de entorno en la carpeta pública. Un reemplazo de la clave OpenAI se realiza en la configuración de secretos, conservando el estado de las ediciones. Revisar el vencimiento de la clave y el saldo del beneficio antes de cada renovación.

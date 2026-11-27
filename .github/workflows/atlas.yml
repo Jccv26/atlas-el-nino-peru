@@ -18,6 +18,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verificar-conexion-macos:
+    if: inputs.contrastar_rutas == true && github.ref == 'refs/heads/main' && github.repository == 'Jccv26/atlas-el-nino-peru' && !github.event.repository.private
+    runs-on: macos-15
+    timeout-minutes: 3
+    steps:
+      - name: Comprobar los dos canales oficiales desde el segundo servidor
+        shell: bash
+        run: |
+          for url in 'https://www.senamhi.gob.pe/?p=avisos-hidrologicos' 'https://idesep.senamhi.gob.pe/geoserver/g_dbphisis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=g_dbphisis%3Aaviso_hidro_pub&outputFormat=application%2Fjson'; do
+            curl --silent --show-error --fail --max-time 14 -o "$RUNNER_TEMP/canal" -w '%{url.host} HTTP %{http_code}\n' "$url" || continue
+            python3 -c 'import json,sys; s=open(sys.argv[1]).read(); print("Avisos en capa:",len(json.loads(s)["features"])) if s.lstrip().startswith("{") else print("Índice con avisos:", "Aviso" in s and "<table" in s)' "$RUNNER_TEMP/canal"
+          done
   actualizar:
     if: github.ref == 'refs/heads/main' && endsWith(github.repository, '/atlas-el-nino-peru') && !github.event.repository.fork && !github.event.repository.private
     runs-on: ubuntu-latest

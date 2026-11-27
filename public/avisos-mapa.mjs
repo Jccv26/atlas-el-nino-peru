@@ -95,7 +95,7 @@ function regionsOf(item) {
 function mergeGroup(members) {
   const original = members.find((m) => m.sourceId !== "coen");
   const primary =
-    original ?? members.find((m) => regionsOf(m).length) ?? members[0];
+    original ?? members.find((m) => !m.rosterListedAt && regionsOf(m).length) ?? members.find((m) => regionsOf(m).length) ?? members[0];
   if (members.length === 1) return primary;
   const sources = [primary, ...members.filter((m) => m !== primary)];
   const regions = new Map(),
@@ -167,7 +167,7 @@ export function layerRecords(items) {
   for (const item of items ?? []) {
     const key = originalKey(item);
     if (!key) {
-      if (item && !item.supersededBy) order.push(item);
+      if (item && !item.supersededBy && !item.withdrawnAt) order.push(item);
       continue;
     }
     if (!groups.has(key)) {
@@ -184,8 +184,8 @@ export function layerRecords(items) {
     }
     const group = groups.get(entry);
     const originals = group.filter((m) => m.sourceId !== "coen");
-    if (originals.length && originals.every((m) => m.supersededBy)) continue;
-    const usable = group.filter((m) => !m.supersededBy && !m.invalidValidity);
+    if (originals.length && originals.every((m) => m.supersededBy || m.withdrawnAt)) continue;
+    const usable = group.filter((m) => !m.supersededBy && !m.withdrawnAt && !m.invalidValidity);
     // Multiple distinct originals for one key are ambiguous. Keep them all
     // visible until the issuer's exact identity can be established.
     if (originals.length > 1) result.push(...usable);

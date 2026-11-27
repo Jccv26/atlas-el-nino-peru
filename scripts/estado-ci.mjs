@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchOcean } from '../public/atlas/oceano.mjs';
 import { fetchTemperature, isTemperatureSnapshot } from '../lib/temperatura.mjs';
 import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
+import { generateExplanations, explanationBatchMaxUsd } from '../lib/explicaciones.mjs';
 import { refreshPanorama } from '../lib/panorama.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
@@ -22,6 +23,17 @@ const relativeState =
   /^boletines\/(\d{4}-\d{2}-\d{2})-(07|13|19)\/(?:(?:text|fuentes)\.json|(?:texto|voz)-[12]\.reserved)$/;
 const limaDay = (stamp) => new Date(stamp - 5 * 3600000).toISOString().slice(0, 10);
 const signature = 'atlas-el-nino-peru/v1';
+const batchSignature = /^[a-f0-9]{64}$/;
+
+// The bulletin can reserve up to two text and two voice attempts in each
+// of 93 monthly editions, at 12 cents an attempt. Both features share the
+// original ceiling. The regional publisher books a whole cent even on timeout.
+export function regionalBudgetCents(value = process.env.OPENAI_BULLETIN_BUDGET_USD ?? 60) {
+  const total = Math.floor(Math.min(60, Number(value)) * 100);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  const bulletin = Math.min(2, Math.floor(total / 2232)) * 2232;
+  return Math.min(600, total - bulletin);
+}
 
 function allowedPath(p) {
   return (
@@ -106,6 +118,10 @@ function unseal(blob, key) {
     !data.grants
   )
     throw new Error('Versión de reservas desconocida');
+  if (data.regional !== undefined && (!Array.isArray(data.regional) ||
+      data.regional.length > 1900 || data.regional.some(g =>
+        !Number.isSafeInteger(g.at) || !batchSignature.test(g.signature) || g.cents !== 1)))
+    throw new Error('Reservas regionales inválidas');
   return data;
 }
 async function restoreState(dir, state) {
@@ -124,7 +140,7 @@ async function restoreState(dir, state) {
     await utimes(target, when, when);
   }
 }
-async function collectState(dir, grants, now) {
+async function collectState(dir, grants, now, regional = []) {
   const entries = {};
   const cutoff = limaDay(now - 62 * dayMs);
   for (const edition of await files(join(dir, 'boletines'))) {
@@ -147,6 +163,7 @@ async function collectState(dir, grants, now) {
     v: 1,
     files: entries,
     grants: Object.fromEntries(Object.entries(grants).filter(([k]) => k.slice(0, 10) >= cutoff)),
+    regional: regional.filter(g => limaDay(g.at) >= cutoff),
   };
 }
 function slotAt(now) {
@@ -284,6 +301,7 @@ export async function publishCycle({
   now = Date.now(),
   refresh,
   generate = generateBulletin,
+  explain = generateExplanations,
   ocean = fetchOcean,
   temperature = fetchTemperature,
   verify = verifyPublic,
@@ -338,7 +356,7 @@ export async function publishCycle({
     } else if (apiEnabled) console.warn('Falta una ATLAS_STATE_KEY de 32 bytes en base64. IA en pausa.');
     const saveMeta = async () => writeFile(join(cache, metaName), JSON.stringify(meta));
     const saveLedger = async () => {
-      const state = await collectState(stateDir, journal.grants, now);
+      const state = await collectState(stateDir, journal.grants, now, journal.regional);
       await writeFile(join(cache, ledgerName), seal(state, key), { mode: 0o600 });
       meta.state = 'initialized';
     };
@@ -433,6 +451,29 @@ export async function publishCycle({
         console.warn('No se pudo preparar el texto de esta franja. Se conservará la última edición.');
       }
     }
+    // Only this serialized publisher spends on regional explanations. Reserve
+    // first in the encrypted remote ledger so retries after a crash are bounded.
+    let explanationRequests = 0;
+    async function reserveBatch({signature: digest, maxUsd}) {
+      if (!journal || !apiEnabled || !batchSignature.test(digest) ||
+          maxUsd !== explanationBatchMaxUsd || maxUsd > 0.01 || explanationRequests >= 4) return false;
+      const month = limaDay(now).slice(0,7);
+      const ledger = (journal.regional ?? []).filter(g => g.at >= now - 62 * dayMs);
+      const monthly = ledger.filter(g => limaDay(g.at).startsWith(month));
+      const matching = monthly.filter(g => g.signature === digest);
+      if (monthly.length >= regionalBudgetCents() || matching.length >= 2 ||
+          matching.some(g => now - g.at < 6 * 3600000)) return false;
+      journal.regional = [...ledger,{at:now,signature:digest,cents:1}];
+      await saveLedger();
+      await saveMeta();
+      commit(cache, 'Reservar lote de explicaciones regionales', token);
+      explanationRequests++;
+      return true;
+    }
+    snapshot.explanations = await explain({
+      ...bulletinInput, previous: previous.explanations, useAI: Boolean(journal && apiEnabled),
+      reserveBatch,
+    });
     await keepAvailableAudio(root, snapshot.bulletin, now);
     await writeFile(join(root, baseFiles[0]), JSON.stringify(snapshot));
     for (const f of await files(join(root, 'public/media'))) {
@@ -447,6 +488,8 @@ export async function publishCycle({
     return {
       iaDisponible: Boolean(journal && apiEnabled),
       intentoIA: Boolean(canGenerate),
+      solicitudesRegionales: explanationRequests,
+      explicacionesIA: Object.values(snapshot.explanations.notices).filter(n => n.mode === 'ia').length,
       edicion: snapshot.bulletin?.id ?? null,
     };
   } finally {
