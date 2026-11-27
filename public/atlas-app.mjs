@@ -13,7 +13,7 @@ import {shareControl,sharePayload} from "./compartir.mjs?v=2";
 import {recordDates,recordSources} from "./ficha-aviso.mjs";
 import {visualPanel} from "./material-visual.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
-import { createMap, mapCities } from "./atlas-map.mjs?v=10";
+import { createMap, mapCities } from "./atlas-map.mjs?v=11";
 import {editionAsset} from "./publicacion.mjs";
 import {renderRegionalPress} from "./prensa-regional.mjs?v=3";
 import {portStatusPanel} from "./puertos.mjs";

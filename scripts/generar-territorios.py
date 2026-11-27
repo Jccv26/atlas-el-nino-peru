@@ -68,10 +68,18 @@ def geometry(source):
     return path,box,point_inside(rings,bounds)
 
 
+# El catálogo cartográfico omite algunas tildes de los nombres oficiales INEI.
+# Se corrigen por UBIGEO para distinguir homónimos en otros departamentos.
+OFFICIAL_NAMES = {
+    '2004': 'Morropón', '200405': 'Morropón',
+    '2102': 'Azángaro', '210201': 'Azángaro',
+    '2106': 'Huancané', '210601': 'Huancané',
+}
+
+
 def display_name(raw, code):
-    # Nombres oficiales de la provincia y del distrito homónimo (INEI 2004 y 200405).
-    if code in {'2004', '200405'}:
-        return 'Morropón'
+    if code in OFFICIAL_NAMES:
+        return OFFICIAL_NAMES[code]
     return ' '.join(word.lower() if i and word in {'DE','DEL','LA','LAS','LOS','Y'} else word.title() for i,word in enumerate(raw.split()))
 
 

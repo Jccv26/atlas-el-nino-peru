@@ -8,6 +8,34 @@ function svg(tag, props={}) {
 }
 const symbols = {lluvia:"M0 -7C-1 -4 -5 0 -5 3a5 5 0 0 0 10 0C5 0 1 -4 0 -7Z",rio:"M-7 -3q3 -4 7 0t7 0M-7 3q3 -4 7 0t7 0",impacto:"M0 -7L7 5H-7Z",grave:"M0 -7L7 5H-7Z",restablecido:"M-6 0l4 4 8 -9",puerto:"M0 -6v11m-6 -4q5 8 12 0M-3 -3h6",pronostico:"M0 -6l6 6 -6 6 -6 -6Z"};
 const ringsByFeature=new WeakMap();
+const labelRows=new WeakMap();
+// Find interior spans in the same even-odd geometry that the map paints.
+// Keeping these positions in geographic coordinates avoids resampling while zooming.
+function interiorLabelRows(feature) {
+  if(labelRows.has(feature))return labelRows.get(feature);
+  const rows=[],box=feature.box;
+  if(box?.height>0) {
+    const rings=Array.from(feature.d.matchAll(/M([^MZ]+)Z/g),part=>
+      part[1].split("L").map(point=>point.split(",").map(Number)));
+    for(let row=0;row<36;row++) {
+      const y=box.y+(row+.5)*box.height/36,edges=[];
+      for(const ring of rings) {
+        for(let a=ring.at(-1),i=0;i<ring.length;i++) {
+          const b=ring[i];
+          if((a[1]>y)!==(b[1]>y))edges.push(a[0]+(b[0]-a[0])*(y-a[1])/(b[1]-a[1]));
+          a=b;
+        }
+      }
+      edges.sort((a,b)=>a-b);
+      for(let i=1;i<edges.length;i+=2) {
+        const width=edges[i]-edges[i-1];
+        if(width>0)rows.push({x:(edges[i]+edges[i-1])/2,y,width});
+      }
+    }
+  }
+  labelRows.set(feature,rows);
+  return rows;
+}
 export function provincialHazardPath(feature,box) {
   if(!box)return feature.d;
   if(!ringsByFeature.has(feature)) {
@@ -98,33 +126,80 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
       const x=(mark.x-view.x)/n,y=(mark.y-view.y)/n;
       occupied.push({left:x-15,right:x+17,top:y-16,bottom:y+13});
     }
-    for (const {label,center,shape,textBox} of paths) {
+    for (const entry of paths) {
+      const {label,center,shape,textBox,selected}=entry;
       const x=(center[0]-view.x)/n,y=(center[1]-view.y)/n;
-      const origin={left:x+textBox.left,right:x+textBox.right,top:y+textBox.top,bottom:y+textBox.bottom};
-      const around=[];
+      const boxAt=(dx,dy,size)=>({left:x+dx+size*textBox.left,right:x+dx+size*textBox.right,
+        top:y+dy+size*textBox.top,bottom:y+dy+size*textBox.bottom});
+      const free=box=>box.left>=3 && box.right<=view.width/n-3 && box.top>=3 && box.bottom<=view.height/n-3 &&
+        !occupied.some(other=>overlaps(box,other));
+      function fits(dx,dy,size) {
+        if(!free(boxAt(dx,dy,size)))return false;
+        if(!shape)return !dx && !dy;
+        // Test the ink box even at the original representative point. In a
+        // narrow province that point can be good for a pin but poor for text.
+        const left=(textBox.left+3)*size,right=(textBox.right-3)*size;
+        const top=(textBox.top+3)*size,bottom=(textBox.bottom-3)*size;
+        for(const v of [.5,.2,.8])for(const u of [0,1,.5]) {
+          if(!shape.isPointInFill(new DOMPoint(center[0]+n*(dx+left+(right-left)*u),
+            center[1]+n*(dy+top+(bottom-top)*v))))return false;
+        }
+        return true;
+      }
+      const origin=boxAt(0,0,1),around=[];
       for(const control of reserved) {
         if(!overlaps(origin,control))continue;
-        // Try the closest edge of the actual overlay. The legend can be much
-        // taller than a label, especially when it lists several observations.
         around.push([0,control.top-origin.bottom-1],[0,control.bottom-origin.top+1],
           [control.left-origin.right-1,0],[control.right-origin.left+1,0]);
       }
-      const candidates=around.length?[[0,0],...around.filter(([dx,dy])=>Math.abs(dx+dy)<=110).sort((a,b)=>Math.hypot(...a)-Math.hypot(...b)),...offsets.slice(1)]:offsets;
-      let shown=false;
-      for(const [dx,dy] of candidates) {
-        const box={left:origin.left+dx,right:origin.right+dx,top:origin.top+dy,bottom:origin.bottom+dy};
-        if(box.left<3 || box.right>view.width/n-3 || box.top<3 || box.bottom>view.height/n-3 ||
-          occupied.some(other=>overlaps(box,other)))continue;
-        const tx=center[0]+n*dx,ty=center[1]+n*dy;
-        // The published centre is inside its province. A shifted label must
-        // also fit there, rather than appearing over an unrelated neighbour.
-        if((dx || dy) && (!shape || ![textBox.left+3,0,textBox.right-3].every(side=>
-          shape.isPointInFill(new DOMPoint(tx+n*side,ty+n*(textBox.top+textBox.bottom)/2)))))continue;
-        occupied.push(box);
-        label.setAttribute("transform","translate("+tx+" "+ty+") scale("+n+")");
-        shown=true;break;
+      const candidates=around.length?[[0,0],...around.filter(([dx,dy])=>Math.abs(dx+dy)<=110)
+        .sort((a,b)=>Math.hypot(...a)-Math.hypot(...b)),...offsets.slice(1)]:offsets;
+      let size=1,position=candidates.find(([dx,dy])=>fits(dx,dy,1));
+      if(!position && selected && shape) {
+        const rows=interiorLabelRows(entry.p);
+        // Use the full-size label wherever possible. Narrow provinces get a
+        // legible 13 or 12 px label before resorting to an anchored callout.
+        for(size of [1,13/15,12/15]) {
+          const width=n*size*(textBox.right-textBox.left-6);
+          const baseline=size*(textBox.top+textBox.bottom)/2;
+          position=rows.filter(row=>row.width>=width).map(row=>[(row.x-center[0])/n,(row.y-center[1])/n-baseline])
+            .sort((a,b)=>Math.hypot(...a)-Math.hypot(...b)).find(([dx,dy])=>fits(dx,dy,size));
+          if(position)break;
+        }
       }
-      label.style.display=shown ? "" : "none";
+      let guideEnd=null;
+      if(!position && shape && shape.isPointInFill(new DOMPoint(...center))) {
+        // If the text cannot fit, the guide must visibly start in its own
+        // province. Neighbours only get a short guide when their anchor is free.
+        const anchor={left:x-3,right:x+3,top:y-3,bottom:y+3};
+        if(free(anchor)) {
+          size=selected?13/15:1;
+          const mid=size*(textBox.top+textBox.bottom)/2;
+          const guides=[[9-size*textBox.left,-mid,8,0],[-9-size*textBox.right,-mid,-8,0],
+            [0,-12-size*textBox.bottom,0,-9],[0,12-size*textBox.top,0,9]];
+          for(const [dx,dy,ex,ey] of guides) {
+            if(!free(boxAt(dx,dy,size)))continue;
+            position=[dx,dy];guideEnd=[ex,ey];occupied.push(anchor);break;
+          }
+        }
+      }
+      if(guideEnd) {
+        if(!entry.guide) {
+          const group=svg("g",{class:"province-label-guide","pointer-events":"none","aria-hidden":"true"});
+          const line=svg("line",{stroke:"#bcdad1","stroke-width":"1.4","stroke-linecap":"round"});
+          group.append(line,svg("circle",{r:"2.2",fill:"#e0f5e9",stroke:"#244942","stroke-width":"1"}));
+          label.before(group);entry.guide={group,line};
+        }
+        const {group,line}=entry.guide;
+        group.style.display="";group.setAttribute("transform","translate("+center.join(" ")+") scale("+n+")");
+        line.setAttribute("x2",guideEnd[0]);line.setAttribute("y2",guideEnd[1]);
+      } else if(entry.guide)entry.guide.group.style.display="none";
+      if(position) {
+        const [dx,dy]=position;
+        occupied.push(boxAt(dx,dy,size));
+        label.setAttribute("transform","translate("+(center[0]+n*dx)+" "+(center[1]+n*dy)+") scale("+n*size+")");
+      }
+      label.style.display=position?"":"none";
     }
     for (const {el,x,y,glyph,counter,hit,radius} of marks) {
       el.setAttribute("transform","translate("+x+" "+y+") scale("+n+")");
