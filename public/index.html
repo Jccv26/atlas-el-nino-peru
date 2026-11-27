@@ -22,10 +22,34 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="./atlas.css?v=3" />
-    <link rel="stylesheet" href="./mapa-interaccion.css?v=5" />
+    <link rel="stylesheet" href="./atlas.css?v=4" />
+    <link rel="stylesheet" href="./mapa-interaccion.css?v=6" />
   </head>
   <body>
+    <aside id="fileEntry" class="file-entry" hidden>
+      <strong>Perú al Día</strong>
+      <p>El mapa y los avisos se consultan en la edición en línea.</p>
+      <a id="editionLink" href="https://jccv26.github.io/atlas-el-nino-peru/" rel="noreferrer">Abrir el mapa de Perú al Día →</a>
+    </aside>
+    <script>
+      if (location.protocol === "file:") {
+        const link = document.getElementById("editionLink");
+        const edition = new URL(link.href);
+        const local = new URL(location.href);
+        for (const name of ["region", "ciudad", "local", "capa", "tema", "tipo", "vigencia", "q", "mapa"]) {
+          if (local.searchParams.has(name)) edition.searchParams.set(name, local.searchParams.get(name));
+        }
+        if (["#inicio", "#temperatura", "#avisos", "#fuentes"].includes(local.hash)) edition.hash = local.hash;
+        document.body.classList.add("opening-edition");
+        document.getElementById("fileEntry").hidden = false;
+        link.href = edition.href;
+        location.replace(edition.href);
+      }
+    </script>
+    <noscript>
+      <p>Para usar el mapa interactivo, activa JavaScript en tu navegador y
+        <a href="https://jccv26.github.io/atlas-el-nino-peru/">abre Perú al Día</a>.</p>
+    </noscript>
     <a class="skip" href="#avisos">Saltar a los avisos</a>
     <header class="mast">
       <a class="brand" href="#inicio" aria-label="Perú al Día, inicio"
@@ -364,6 +388,8 @@
       <h2 id="dialogTitle"></h2>
       <div id="dialogBody"></div>
     </dialog>
-    <script src="./atlas-app.mjs?v=7" type="module"></script>
+    <script type="module">
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=8");
+    </script>
   </body>
 </html>

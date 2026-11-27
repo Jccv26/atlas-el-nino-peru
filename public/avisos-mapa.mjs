@@ -42,7 +42,7 @@ function originalKey(item) {
   if (item.sourceId === "coen") {
     const ref = item.originNotice;
     const definition =
-      ref && Object.hasOwn(families, ref.sourceId) && families[ref.sourceId];
+      ref && Object.prototype.hasOwnProperty.call(families, ref.sourceId) && families[ref.sourceId];
     const title = fold(item.title);
     if (
       !definition ||
@@ -55,7 +55,7 @@ function originalKey(item) {
       return "";
     return [ref.sourceId, year(ref.year), number(ref.number)].join("/");
   }
-  if (!Object.hasOwn(families, item.sourceId)) return "";
+  if (!Object.prototype.hasOwnProperty.call(families, item.sourceId)) return "";
   if (
     item.category &&
     !families[item.sourceId].categories.includes(fold(item.category))

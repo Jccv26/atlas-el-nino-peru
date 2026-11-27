@@ -71,6 +71,17 @@ button:hover:not(:disabled) {
 [hidden] {
   display: none !important;
 }
+.opening-edition > :not(.file-entry) {
+  display: none !important;
+}
+.file-entry {
+  max-width: 32rem;
+  margin: 12vh auto;
+  padding: 1.5rem;
+}
+.file-entry a {
+  text-decoration: underline;
+}
 .skip {
   position: absolute;
   top: -80px;

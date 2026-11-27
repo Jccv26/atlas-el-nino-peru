@@ -138,7 +138,7 @@
 }
 .atlas-callao {
   cursor: pointer;
-  pointer-events: all;
+  pointer-events: none;
 }
 .atlas-callao-line {
   stroke: #ccf1e7;
@@ -274,6 +274,9 @@
 }
 #mapLabels text.city {
   transform: translateX(calc(var(--atlas-pixel) * 4.8));
+}
+#mapLabels .map-city[data-city="Lima"] text {
+  transform: translateX(calc(var(--atlas-pixel) * -5));
 }
 #map .country-path {
   vector-effect: non-scaling-stroke;
@@ -426,6 +429,50 @@
   }
 }
 @media (max-width: 760px) {
+  .map-frame,
+  .map-frame.atlas-region-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    background: #10242b;
+  }
+  .map-frame #map {
+    grid-area: 1 / 1 / 2 / -1;
+  }
+  #map:not(.map-zoomed) .map-label.city {
+    font-size: calc(var(--atlas-pixel) * 10);
+    stroke-width: calc(var(--atlas-pixel) * 1.8);
+  }
+  .map-frame .map-legend {
+    position: static;
+    grid-area: 2 / 1 / 3 / 2;
+    min-width: 0;
+    max-width: none;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .map-frame .map-tools {
+    position: static;
+    grid-area: 2 / 2 / 3 / 3;
+    display: flex;
+    align-self: center;
+    margin-right: 10px;
+  }
+  .map-frame .map-tools button {
+    width: 34px;
+    height: 38px;
+  }
+  .map-frame .map-tools button + button {
+    border-top: 0;
+    border-left: 1px solid #48606b;
+  }
+  .map-frame.atlas-region-open .region-card:not([hidden]) {
+    grid-area: 3 / 1 / 4 / -1;
+  }
+  .map-frame .climate-card {
+    grid-area: 4 / 1 / 5 / -1;
+  }
   .map-frame.has-region .region-card:not([hidden]) {
     padding: 16px var(--edge) 20px;
     max-height: none;

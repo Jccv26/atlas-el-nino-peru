@@ -1,6 +1,6 @@
-import { createMap, mapCities } from "./atlas-map.mjs?v=3";
+import { createMap, mapCities } from "./atlas-map.mjs?v=4";
 import {portStatusPanel} from "./puertos.mjs";
-import { layerRecords, noticeForRegionDay } from "./avisos-mapa.mjs?v=2";
+import { layerRecords, noticeForRegionDay } from "./avisos-mapa.mjs?v=3";
 const $ = (id) => document.getElementById(id);
 const node = (tag, text = "", css = "") => {
   const el = document.createElement(tag);
@@ -1285,7 +1285,7 @@ function restoreLocation() {
   topic = ["agua", "rios", "lluvias", "mar"].includes(q.get("tema"))
     ? q.get("tema")
     : "";
-  period = Object.hasOwn(periodNames, q.get("vigencia"))
+  period = Object.prototype.hasOwnProperty.call(periodNames, q.get("vigencia"))
     ? q.get("vigencia")
     : "";
   fromLayer = q.get("mapa") === "1" && topic === layer && feed === "oficial";
@@ -1312,8 +1312,8 @@ function renderSources() {
   const provenance = panel?.publication;
   const triggers = {push:"un cambio publicado", workflow_dispatch:"una solicitud manual", schedule:"el horario de GitHub", rerun:"la repetición de una ejecución anterior"};
   const state = $("publicationStatus");
-  state.hidden = !provenance || !Object.hasOwn(triggers, provenance.event);
-  if (!state.hidden) {
+  if (state) state.hidden = !provenance || !Object.prototype.hasOwnProperty.call(triggers, provenance.event);
+  if (state && !state.hidden) {
     const history = "https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/atlas.yml?query=event%3Aschedule";
     state.replaceChildren(document.createTextNode("Esta edición se inició por " + triggers[provenance.event] +
       ". " + (provenance.lastScheduled?.at
@@ -1387,7 +1387,7 @@ async function loadWeekly() {
   try {
     const r = await fetch("./data/temperatura.json", {
       cache: "no-cache",
-      signal: AbortSignal.timeout(8000),
+      signal: globalThis.AbortSignal?.timeout?.(8000),
     });
     if (!r.ok) return;
     const d = await r.json();
@@ -1625,7 +1625,7 @@ async function load() {
     try {
       const res = await fetch(path, {
         cache: "no-cache",
-        signal: AbortSignal.timeout(7500),
+        signal: globalThis.AbortSignal?.timeout?.(7500),
       });
       if (!res.ok) continue;
       const data = await res.json();

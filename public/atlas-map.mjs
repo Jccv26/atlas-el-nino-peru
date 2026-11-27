@@ -385,7 +385,7 @@ export async function createMap({ onRegion, onOceanReady }) {
       x: lon + 105,
       y: 6 - lat,
       "font-size": size,
-      "text-anchor": kind === "city" ? "start" : "middle",
+      "text-anchor": kind === "city" ? (label === "Lima" ? "end" : "start") : "middle",
       class: "map-label " + kind,
     });
     t.style.setProperty(
@@ -459,8 +459,9 @@ export async function createMap({ onRegion, onOceanReady }) {
     return { name, group, bounds: regions.get(name).getBBox() };
   }
   const compactTags = [
-    cityTag("Callao", "Callao", -9, 0, 46),
-    cityTag("Lima Metropolitana", "Lima Metropolitana", 10, -17, 107),
+    // Both touch targets sit offshore, clear of the inland regions and Lima city.
+    cityTag("Callao", "Callao", -27, -20, 46),
+    cityTag("Lima Metropolitana", "Lima Metropolitana", -15, 27, 99),
   ];
   const sampleMark = svg("g", {
     class: "atlas-ocean-sample",
@@ -826,7 +827,7 @@ export async function createMap({ onRegion, onOceanReady }) {
         ...opt,
         cache: "no-cache",
         headers: oceanValidator,
-        signal: AbortSignal.timeout(15000),
+        signal: globalThis.AbortSignal?.timeout?.(15000),
       });
       if (response.status === 304 && grid) return false;
       if (!response.ok) throw Error("Cuadrícula NOAA no disponible");

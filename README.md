@@ -4,6 +4,8 @@ Piloto ciudadano con cartografía del Perú, observaciones del mar, intensidad d
 
 ## Uso local
 
+Al abrir `public/index.html` con doble clic, el navegador lleva al visitante a [la edición pública de Perú al Día](https://jccv26.github.io/atlas-el-nino-peru/). Para probar cambios que todavía están en tu computadora, usa el servidor local.
+
 Se requiere Node.js 24. Para leer los boletines del COEN, el publicador utiliza `pdftotext` de Poppler, disponible como `poppler-utils` en Ubuntu. La interfaz se puede servir desde esta carpeta con estos comandos.
 
 ```sh
