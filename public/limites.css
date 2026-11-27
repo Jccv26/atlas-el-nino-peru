@@ -2,6 +2,8 @@
 #map .peru-outline path { stroke-linejoin: round; stroke-linecap: round; }
 #map .peru-outline .casing { stroke: #112d32; stroke-width: 5.4px; }
 #map .peru-outline .edge { stroke: #f6fae8; stroke-width: 3px; }
+#map .region-casing {stroke:#1d3536;stroke-width:3.5px;stroke-linejoin:round}
+#map:is(.atlas-region-view,.atlas-province-view) .region-casing {display:none}
 #map .region-path { stroke: #e2ede2; stroke-opacity: .96; stroke-width: 1.6px; }
 #map .region-path {transition-property:stroke}
 #map .region-path.region-from-list {stroke:#f4fffb;stroke-width:3px}
@@ -11,8 +13,63 @@
 #map .region-path.focused,
 #map .region-path.atlas-hover,
 #map .region-path:focus-visible { stroke: #adffe9; stroke-width: 2.8px; }
-#map .local-area { stroke: #bed7d2; stroke-width: 1.2px; }
-#map .local-area.is-selected { fill:#96e9d03d; stroke: #acffe3; stroke-width: 2.8px; }
+/* Local fills sit beneath the official forecast, boundaries and report markers. */
+.map-frame #map:is(.atlas-region-view,.atlas-province-view) #regions .region-path {
+  fill: transparent !important;
+}
+#map .province-fills {pointer-events:none}
+#map {user-select:none;-webkit-user-select:none}
+#map.atlas-province-view #countryLines .country-path {
+  vector-effect:non-scaling-stroke;
+  stroke-width:1.5px;
+}
+#map .province-fill {fill:#354e49}
+#map .province-fill[data-tone="1"] {fill:#405854}
+#map .province-fill[data-tone="2"] {fill:#384d50}
+#map .province-fill.adjacent {fill:#293e40}
+#map .province-fill.is-selected {fill:#53796d}
+#map.atlas-region-view:not(.atlas-province-view) .province-fills {opacity:.74}
+#map:is(.atlas-region-view,.atlas-province-view) .hazard-polygons path {opacity:.68}
+#map .local-area {
+  fill:transparent;
+  stroke:#b2c6bb;
+  stroke-width:1.4px;
+  stroke-linejoin:round;
+  cursor:pointer;
+}
+#map .local-area.adjacent {stroke:#829e99;stroke-dasharray:4 3}
+#map .province-selection-casing {
+  fill:none;
+  stroke:#10282b;
+  stroke-width:5.4px;
+  stroke-linejoin:round;
+  pointer-events:none;
+}
+#map .local-area.is-selected {stroke:#f2ffe5;stroke-width:2.8px}
+#map .local-area:focus-visible {outline:none;stroke:#fff;stroke-width:3px}
+@media (hover:hover) {
+  #map .local-area:not(.is-selected):hover {stroke:#e0f1e6;stroke-width:2px}
+}
+#map .area-label.current {stroke:#19352f}
+.map-frame.has-region .coverage-text:not(:disabled)::before {content:none}
+.selected-province-key {display:none}
+.has-local-area .selected-province-key {
+  display:flex;align-items:center;gap:7px;margin-top:4px;font-size:11px;color:#d2e3dc;
+}
+.selected-province-key::before {
+  content:"";width:13px;height:9px;box-sizing:border-box;border:2px solid #f2ffe5;
+  border-radius:3px;background:#53796d;box-shadow:0 0 0 1px #10282b;
+}
+.explorer > .map-key {
+  grid-column:1 / -1;
+  grid-row:2;
+  margin:0;
+  padding:12px 15px;
+  border-top:1px solid #3b5557;
+}
+@media (min-width:761px) {
+  .explorer > .local-pane {grid-area:1 / 2}
+}
 #map.atlas-province-view .peru-outline { display:none; }
 #map:not(.map-zoomed) .map-city[data-city="Piura"] text {
   transform:translate(calc(var(--atlas-pixel) * 20),calc(var(--atlas-pixel) * 4));

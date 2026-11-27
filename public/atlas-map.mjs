@@ -1,5 +1,5 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
-import {localMap} from "./mapa-local.mjs?v=5";
+import {localMap} from "./mapa-local.mjs?v=6";
 import {combinedLabels} from "./capa-todo.mjs?v=2";
 import {editionAsset} from "./publicacion.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
@@ -351,6 +351,15 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
   const anchors = new Map();
   const clearance = new Map();
   const regionGroup = $("regions");
+  const nationalBoundaries = svg("path", {
+    d: geo.regions.map(region => region.d).join(" "),
+    class: "region-casing",
+    fill: "none",
+    "vector-effect": "non-scaling-stroke",
+    "aria-hidden": "true",
+    "pointer-events": "none",
+  });
+  regionGroup.before(nationalBoundaries);
   regionGroup.setAttribute("role", "group");
   regionGroup.setAttribute("aria-label", "Regiones del Perú");
   const help = document.createElement("p");
@@ -924,6 +933,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     local(scope, signals, notices, index) {
       const provincial=Boolean(scope.area);
       map.classList.toggle("atlas-province-view",provincial);
+      map.classList.toggle("atlas-region-view",Boolean(scope.region && !provincial));
       regionGroup.setAttribute("aria-hidden",String(provincial));
       regions.get(tabRegion)?.setAttribute("tabindex",provincial?"-1":"0");
       void localOverlay.scope(scope.region,scope.area,index);

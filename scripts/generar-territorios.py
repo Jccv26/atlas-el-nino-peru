@@ -68,7 +68,10 @@ def geometry(source):
     return path,box,point_inside(rings,bounds)
 
 
-def display_name(raw):
+def display_name(raw, code):
+    # Nombres oficiales de la provincia y del distrito homónimo (INEI 2004 y 200405).
+    if code in {'2004', '200405'}:
+        return 'Morropón'
     return ' '.join(word.lower() if i and word in {'DE','DEL','LA','LAS','LOS','Y'} else word.title() for i,word in enumerate(raw.split()))
 
 
@@ -89,7 +92,7 @@ def main():
             a = row['attributes']; code = a[id_field]; parent = code[:-2]
             if not re.fullmatch(r'\d{4}' if layer=='provincias' else r'\d{6}',code) or code in codes or parent not in parents or a['IDDPTO'] != code[:2] or a['IDPROV'] != code[:4]:
                 raise ValueError(f'UBIGEO incompatible: {code}')
-            name = display_name(a[name_field]); d,box,center = geometry(row['geometry'])
+            name = display_name(a[name_field],code); d,box,center = geometry(row['geometry'])
             groups[parent].append(dict(id=code,name=name,d=d,box=box))
             place=dict(id=code,name=name,center=center)
             if key=='provinces':

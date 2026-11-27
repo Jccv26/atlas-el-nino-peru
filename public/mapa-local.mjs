@@ -33,7 +33,9 @@ export function provincialHazardPath(feature,box) {
     r.y<=box.y+box.height+pad && r.bottom>=box.y-pad).map(r=>r.path).join("");
 }
 export function localMap({world,fit,fitRegion,onArea,onGroup}) {
-  const boundaries=svg("g",{class:"local-boundaries"}), hazards=svg("g",{class:"hazard-polygons","aria-hidden":"true"}), pins=svg("g",{class:"signal-pins","aria-label":"Puntos con reportes"});
+  const fills=svg("g",{class:"province-fills","aria-hidden":"true","pointer-events":"none"});
+  const boundaries=svg("g",{class:"local-boundaries"}), hazards=svg("g",{class:"hazard-polygons","aria-hidden":"true","pointer-events":"none"}), pins=svg("g",{class:"signal-pins","aria-label":"Puntos con reportes"});
+  world.insertBefore(fills,world.querySelector("#mapLabels"));
   world.insertBefore(hazards,world.querySelector("#mapLabels"));
   world.insertBefore(boundaries,world.querySelector("#mapLabels"));
   world.append(pins);
@@ -47,31 +49,82 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
   }
   let seq=0,lastScope=null,paths=[],visibleFeatures=[],lastMarks="",marks=[],unit=0,lastSectors="";
   let drawnLayer="",pinTransition;
+  const map=world.ownerSVGElement,frame=map.parentElement;
+  const controls=[...frame.querySelectorAll(".map-scope,.layer-switch,#hazardChoice,#mapLegend,#mapBack")];
+  let reserved=[],layoutDirty=true,layoutFrame=0;
+  function invalidateLayout() {
+    layoutDirty=true;
+    if(layoutFrame || !paths.length)return;
+    layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;if(unit>0)scale(unit);});
+  }
+  const resizeControls=new ResizeObserver(invalidateLayout);
+  for(const control of [map,...controls])resizeControls.observe(control);
+  const framesChanged=new MutationObserver(invalidateLayout);
+  framesChanged.observe(frame,{attributes:true,attributeFilter:["class","data-map-layer"]});
+  for(const control of controls)framesChanged.observe(control,{attributes:true,attributeFilter:["hidden","class"]});
+  function measureControls() {
+    const mapBox=map.getBoundingClientRect();
+    reserved=[];
+    for(const control of controls) {
+      const rect=control.getBoundingClientRect();
+      if(rect.width>0 && rect.height>0 && rect.left<mapBox.right && rect.right>mapBox.left &&
+        rect.top<mapBox.bottom && rect.bottom>mapBox.top && getComputedStyle(control).visibility!=="hidden") {
+        reserved.push({left:rect.left-mapBox.left-4,right:rect.right-mapBox.left+4,top:rect.top-mapBox.top-4,bottom:rect.bottom-mapBox.top+4});
+      }
+    }
+    layoutDirty=false;
+  }
+  function measureLabels() {
+    // Measure text at its intrinsic SVG size only when geometry or fonts change.
+    for(const {label} of paths)label.style.display="";
+    for(const entry of paths) {
+      const b=entry.label.getBBox();
+      entry.textBox={left:b.x-3,right:b.x+b.width+3,top:b.y-3,bottom:b.y+b.height+3};
+    }
+  }
+  document.fonts?.ready.then(()=>{if(paths.length){measureLabels();invalidateLayout();}});
+  const offsets=[[0,0],[0,-22],[0,24],[-22,0],[22,0],[0,-42],[0,44],[-30,-18],[30,-18],[-30,18],[30,18]];
+  const overlaps=(a,b)=>a.left<b.right && a.right>b.left && a.top<b.bottom && a.bottom>b.top;
   const warning=document.createElement("p");
   warning.className="province-map-status"; warning.hidden=true; warning.setAttribute("role","status");
   world.ownerSVGElement.parentElement.append(warning);
   function scale(n) {
     if (!(n>0) || !Number.isFinite(n)) return;
     unit=n;
-    const occupied=[];
+    if(layoutDirty && paths.length)measureControls();
     const view=world.ownerSVGElement.viewBox.baseVal;
-    for (const {label,p,center,selected} of paths) {
+    const occupied=reserved.slice();
+    for(const mark of marks) {
+      const x=(mark.x-view.x)/n,y=(mark.y-view.y)/n;
+      occupied.push({left:x-15,right:x+17,top:y-16,bottom:y+13});
+    }
+    for (const {label,center,shape,textBox} of paths) {
       const x=(center[0]-view.x)/n,y=(center[1]-view.y)/n;
-      const half=Math.max(14,p.name.length*(selected?4.3:3.3)+3);
-      const offset=[0,-22,27,-43,50].find(delta=>{
-        const baseline=y+delta;
-        return x>half && x<view.width/n-half && baseline>14 && baseline<view.height/n-7 &&
-          !occupied.some(other=>Math.abs(other.y-baseline)<17 && Math.abs(other.x-x)<other.half+half+5) &&
-          !marks.some(mark=>Math.abs((mark.x-center[0])/n)<half+15 &&
-            Math.abs((mark.y-center[1])/n-delta+5)<21);
-      });
-      const visible=selected || offset!==undefined;
-      label.style.display=visible ? "" : "none";
-      if (visible) {
-        const delta=offset ?? -22;
-        occupied.push({x,y:y+delta,half});
-        label.setAttribute("transform","translate("+center[0]+" "+(center[1]+n*delta)+") scale("+n+")");
+      const origin={left:x+textBox.left,right:x+textBox.right,top:y+textBox.top,bottom:y+textBox.bottom};
+      const around=[];
+      for(const control of reserved) {
+        if(!overlaps(origin,control))continue;
+        // Try the closest edge of the actual overlay. The legend can be much
+        // taller than a label, especially when it lists several observations.
+        around.push([0,control.top-origin.bottom-1],[0,control.bottom-origin.top+1],
+          [control.left-origin.right-1,0],[control.right-origin.left+1,0]);
       }
+      const candidates=around.length?[[0,0],...around.filter(([dx,dy])=>Math.abs(dx+dy)<=110).sort((a,b)=>Math.hypot(...a)-Math.hypot(...b)),...offsets.slice(1)]:offsets;
+      let shown=false;
+      for(const [dx,dy] of candidates) {
+        const box={left:origin.left+dx,right:origin.right+dx,top:origin.top+dy,bottom:origin.bottom+dy};
+        if(box.left<3 || box.right>view.width/n-3 || box.top<3 || box.bottom>view.height/n-3 ||
+          occupied.some(other=>overlaps(box,other)))continue;
+        const tx=center[0]+n*dx,ty=center[1]+n*dy;
+        // The published centre is inside its province. A shifted label must
+        // also fit there, rather than appearing over an unrelated neighbour.
+        if((dx || dy) && (!shape || ![textBox.left+3,0,textBox.right-3].every(side=>
+          shape.isPointInFill(new DOMPoint(tx+n*side,ty+n*(textBox.top+textBox.bottom)/2)))))continue;
+        occupied.push(box);
+        label.setAttribute("transform","translate("+tx+" "+ty+") scale("+n+")");
+        shown=true;break;
+      }
+      label.style.display=shown ? "" : "none";
     }
     for (const {el,x,y,glyph,counter,hit,radius} of marks) {
       el.setAttribute("transform","translate("+x+" "+y+") scale("+n+")");
@@ -89,35 +142,49 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
   }
   function drawBoundaries(features,region,id,index) {
     const material=document.createDocumentFragment();
+    const surfaces=document.createDocumentFragment();
     const active=boundaries.contains(document.activeElement)?document.activeElement.dataset.area:"";
+    let selection=null,casing=null;
     paths=[];
     for (const p of features) {
       const place=index.byId.get(p.id);
       if(!place)continue;
       const selected=p.id===id, neighbour=index.regionOf(p.id)!==region;
-      const el=svg("path",{d:p.d,"fill-rule":"evenodd",class:"local-area"+(selected?" is-selected":"")+(neighbour?" adjacent":""),
+      const state=(selected?" is-selected":"")+(neighbour?" adjacent":"");
+      surfaces.append(svg("path",{d:p.d,"fill-rule":"evenodd",class:"province-fill"+state,
+        "data-province":p.id,"data-tone":Number(p.id)%3,stroke:"none"}));
+      const el=svg("path",{d:p.d,"fill-rule":"evenodd",fill:"transparent",class:"local-area"+state,
+        "pointer-events":"fill","vector-effect":"non-scaling-stroke",
         "data-area":p.id,role:"button",tabindex:neighbour?"-1":"0","aria-label":"Provincia de "+p.name,"aria-pressed":String(selected)});
       const title=svg("title");
-      title.textContent=p.name;el.append(title);material.append(el);
+      title.textContent=p.name;el.append(title);
+      if(selected) {
+        selection=el;
+        casing=svg("path",{d:p.d,class:"province-selection-casing",fill:"none","vector-effect":"non-scaling-stroke","pointer-events":"none","aria-hidden":"true"});
+      } else material.append(el);
       el.onkeydown=e=>{if(e.key==="Enter" || e.key===" "){e.preventDefault();e.stopPropagation();onArea(p.id);}};
       const label=svg("text",{class:"area-label"+(selected?" current":""),"text-anchor":"middle","aria-hidden":"true"});
       label.textContent=p.name;
-      paths.push({label,p,center:place.center,selected,neighbour});
+      paths.push({label,p,center:place.center,shape:el,selected,neighbour});
     }
     paths.sort((a,b)=>Number(b.selected)-Number(a.selected) || Number(a.neighbour)-Number(b.neighbour));
     visibleFeatures=features;
     world.ownerSVGElement.classList.remove("province-awaits-shape");
+    if(selection)material.append(casing,selection);
+    fills.replaceChildren(surfaces);
     boundaries.replaceChildren(material,...paths.map(p=>p.label));
+    measureLabels();
     if(unit>0)scale(unit);
     if(active)boundaries.querySelector('[data-area="'+active+'"]')?.focus({preventScroll:true});
   }
   function pendingSelection(selected) {
-    paths=[]; visibleFeatures=[]; boundaries.replaceChildren();
+    paths=[]; visibleFeatures=[]; fills.replaceChildren(); boundaries.replaceChildren();
     world.ownerSVGElement.classList.add("province-awaits-shape");
     if(selected?.center) {
       const label=svg("text",{class:"area-label current","text-anchor":"middle"});
       label.textContent=selected.name;boundaries.append(label);
       paths=[{p:selected,center:selected.center,label,selected:true}];
+      measureLabels();
       if(unit>0)scale(unit);
     }
   }
@@ -129,7 +196,11 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
     const previous=lastScope;
     const order=++seq;
     lastScope=key;warning.hidden=true;
-    if (!region) {paths=[];visibleFeatures=[];boundaries.replaceChildren();return;}
+    if (!region) {
+      paths=[];visibleFeatures=[];fills.replaceChildren();boundaries.replaceChildren();
+      world.ownerSVGElement.classList.remove("province-awaits-shape");
+      return;
+    }
     const dep=index.department(region);
     if (!dep) return;
     const selected=id && index.byId.get(id);

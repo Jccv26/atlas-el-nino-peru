@@ -13,7 +13,7 @@ import {shareControl,sharePayload} from "./compartir.mjs?v=2";
 import {recordDates,recordSources} from "./ficha-aviso.mjs";
 import {visualPanel} from "./material-visual.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
-import { createMap, mapCities } from "./atlas-map.mjs?v=9";
+import { createMap, mapCities } from "./atlas-map.mjs?v=10";
 import {editionAsset} from "./publicacion.mjs";
 import {renderRegionalPress} from "./prensa-regional.mjs?v=3";
 import {portStatusPanel} from "./puertos.mjs";
@@ -1118,7 +1118,9 @@ function syncLayer() {
     : layer==="rios" ? "Estaciones y reportes" : "Lluvias e impactos";
   const count=result.current.length;
   const place=(ubigeo && catalog?.byId.get(ubigeo)?.name) || regionLabel(region);
-  const localCount=count ? count+(count===1?" reporte":" reportes")+" en "+place : "Sin reportes en esta vista de "+place;
+  const rainOnly = count > 0 && result.current.every(signal => signal.type === "observacion" && signal.layer === "lluvias");
+  const unit = rainOnly ? (count === 1 ? "medición de lluvia" : "mediciones de lluvia") : (count === 1 ? "reporte" : "reportes");
+  const localCount = count ? count+" "+unit+" en "+place : "Sin reportes en esta vista de "+place;
   const documented=result.overview.filter(r=>r.mark==="grave" || r.mark==="impacto").length;
   const nationalCount=layer==="todo" && mode==="ahora"
     ? documented+(documented===1?" región con impactos documentados":" regiones con impactos documentados")
@@ -1724,12 +1726,10 @@ function renderSources() {
   const state = $("publicationStatus");
   if (state) state.hidden = !provenance || !Object.prototype.hasOwnProperty.call(triggers, provenance.event);
   if (state && !state.hidden) {
-    const history = "https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/horario.yml?query=event%3Aschedule";
-    state.replaceChildren(document.createTextNode("Esta edición se inició por " + triggers[provenance.event] +
+    state.textContent = "Esta edición se inició por " + triggers[provenance.event] +
       ". " + (provenance.lastScheduled?.at
-        ? "Última consulta iniciada por horario el " + dateTime(provenance.lastScheduled.at) + ". "
-        : "La primera consulta por horario está pendiente de verificación. ")),
-      link("Ver el registro de actualizaciones automáticas ↗", history));
+        ? "Última consulta iniciada por horario el " + dateTime(provenance.lastScheduled.at) + "."
+        : "La primera consulta por horario está pendiente de verificación.");
   }
   const sources =
     panel?.sources ||

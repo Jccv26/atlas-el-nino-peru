@@ -46,8 +46,6 @@
 .symbol.rio,.symbol.puerto,.symbol.restablecido {border-radius:50%}
 .symbol.impacto,.symbol.grave {clip-path:polygon(50% 0%,100% 100%,0 100%)}
 .symbol.pronostico {transform:rotate(45deg);width:8px;height:8px}
-#map .local-area {fill:#a1e3d50a;stroke:#ccefe2ce;stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer}
-#map .local-area:hover,#map .local-area.is-selected {fill:#8ae7c935;stroke:#d1f9ea;stroke-width:2}
 .hazard-polygons {pointer-events:none}
 .hazard-polygons path {stroke:none;opacity:.68}
 .sector-rojo {fill:#e6635c}.sector-naranja {fill:#eea45c}.sector-amarillo {fill:#e5cf74}
@@ -76,10 +74,11 @@
 .record-timeline li {margin:9px 0}
 @media(prefers-reduced-motion:no-preference){
   .pin-glyph {animation:pin-arrival .28s cubic-bezier(.22,.65,.35,1) both}
-  .local-boundaries path,.hazard-polygons path {animation:boundary-arrival .28s ease-out both}
+  .local-boundaries path {animation:boundary-arrival .28s ease-out}
+  .hazard-polygons path {animation:boundary-arrival .28s ease-out}
   .view-switch button,.signal-row {transition:background-color .22s,color .22s}
   @keyframes pin-arrival {from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
-  @keyframes boundary-arrival {from{opacity:.2}to{opacity:1}}
+  @keyframes boundary-arrival {from{opacity:.2}}
 }
 @media(max-width:900px) and (min-width:761px){
   .explorer {grid-template-columns:minmax(0,1fr) 275px}
@@ -115,13 +114,11 @@
 .hazard-polygons path{opacity:.49}
 #map .area-label{font:560 11px Instrument,Arial,sans-serif;fill:#e3f2dd;paint-order:stroke;stroke:#1b3d3c;stroke-width:2.4;stroke-linejoin:round;pointer-events:none}
 #map .area-label.current{font-size:15px;fill:#fff;stroke-width:3;letter-spacing:.1px}
-#map .local-area.is-selected{fill:#a3ffcf0a;stroke:#ecffdb;stroke-width:2.6}
 @media(max-width:760px){.hazard-choice{top:46px;right:9px}}
 #pastSignals {margin-top:14px;border-top:1px solid #37565a;padding-top:10px}
 #pastSignals summary {color:#bfd7cf;font-size:13px;cursor:pointer}
 .source-freshness{font:400 12px/1.45 Instrument,Arial,sans-serif;color:#bed1c9;margin:6px 0 3px}
 .edition-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin:12px 0}
-.edition-controls a{color:inherit;text-decoration:underline}
 
 .place-heading {
   display:flex;

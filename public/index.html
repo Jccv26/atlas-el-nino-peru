@@ -22,10 +22,10 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="./atlas.css?v=6" />
-    <link rel="stylesheet" href="./mapa-interaccion.css?v=7" />
-    <link rel="stylesheet" href="./situacion.css?v=4" />
-    <link rel="stylesheet" href="./limites.css" />
+    <link rel="stylesheet" href="./atlas.css?v=7" />
+    <link rel="stylesheet" href="./mapa-interaccion.css?v=8" />
+    <link rel="stylesheet" href="./situacion.css?v=5" />
+    <link rel="stylesheet" href="./limites.css?v=2" />
     <link rel="stylesheet" href="./material-visual.css" />
   </head>
   <body>
@@ -170,6 +170,7 @@
           <div class="hazard-choice" id="hazardChoice" role="group" aria-label="Área de peligro a dibujar" hidden><button data-hazard="lluvias" aria-pressed="true">Lluvia en 24 h</button><button data-hazard="quebradas" aria-pressed="false">Quebradas</button></div>
           <div class="map-legend" id="mapLegend" aria-live="polite">
             <div id="legendTitle">Impactos y mediciones</div>
+            <span class="selected-province-key">Provincia seleccionada</span>
             <div class="scale-bar" id="scaleBar" hidden></div>
             <div class="scales" id="scales" hidden>
               <span>−4</span><span>0</span><span>+4</span><span>+8</span>
@@ -193,6 +194,7 @@
           </div>
 
         </div>
+          <div id="mapKey" class="map-key"></div>
           <aside class="local-pane" aria-labelledby="placeTitle">
             <nav id="placeTrail" class="place-trail" aria-label="Ruta territorial"></nav>
             <div class="place-heading">
@@ -253,7 +255,6 @@
             </details>
           </aside>
         </div>
-        <div id="mapKey" class="map-key"></div>
       </section>
       <section class="climate-context" aria-label="El Niño en perspectiva">
           <div class="climate-card" id="climateCard">
@@ -392,7 +393,7 @@
             Cada entidad publica a su propio ritmo. Una consulta reciente puede
             devolver un documento anterior. Revisa la vigencia en el original.
           </p>
-          <div class="edition-controls"><button id="checkEdition" type="button" class="outline-btn">Comprobar última edición</button><a href="https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/horario.yml" target="_blank" rel="noopener">Historial y actualización en GitHub ↗</a></div>
+          <div class="edition-controls"><button id="checkEdition" type="button" class="outline-btn">Comprobar última edición</button></div>
           <p id="publicationStatus" class="subtle" hidden></p>
           <div id="sourceList" class="source-list"></div>
           <h3>Cartografía</h3>
@@ -437,9 +438,13 @@
         </details>
       </section>
     </main>
-    <footer>
+    <footer id="iniciativa">
       <span><b>Perú al Día</b> <i> / </i> El Niño hoy</span>
-      <span>Iniciativa ciudadana</span><a href="#inicio">Volver al mapa ↑</a>
+      <div class="footer-credit">
+        <p>Iniciativa ciudadana · Hecho por <a href="https://www.linkedin.com/in/julio-cachay-vilchez" rel="me noopener" target="_blank">Julio Cachay</a></p>
+        <p>Sitio no oficial de carácter informativo. Ante una emergencia, sigue las indicaciones del <a href="https://www.gob.pe/indeci" target="_blank" rel="noopener">INDECI</a>.</p>
+      </div>
+      <a href="#inicio">Volver al mapa ↑</a>
     </footer>
     <dialog id="infoDialog" aria-labelledby="dialogTitle">
       <div class="dialog-header">
@@ -450,7 +455,7 @@
       <div id="dialogBody"></div>
     </dialog>
     <script type="module">
-      if (location.protocol !== "file:") import("./atlas-app.mjs?v=21");
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=22");
     </script>
   </body>
 </html>
