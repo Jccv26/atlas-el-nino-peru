@@ -1,3 +1,4 @@
+import {editionAsset} from "./publicacion.mjs";
 const ns="http://www.w3.org/2000/svg";
 function svg(tag, props={}) {
   const el=document.createElementNS(ns,tag);
@@ -12,7 +13,7 @@ export function localMap({world,fit,fitRegion,onArea,onGroup}) {
   world.append(pins);
   const cache=new Map();
   function json(path,volatile=false) {
-    if (!cache.has(path)) cache.set(path,fetch(path,volatile?{cache:"no-cache"}:{}).then(r=>{
+    if (!cache.has(path)) cache.set(path,fetch(volatile?editionAsset(path):path,volatile?{cache:"no-cache"}:{}).then(r=>{
       if (!r.ok) throw Error("Capa sin respuesta");
       return r.json();
     }).catch(e=>{cache.delete(path);throw e;}));

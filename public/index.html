@@ -24,7 +24,7 @@
     />
     <link rel="stylesheet" href="./atlas.css?v=4" />
     <link rel="stylesheet" href="./mapa-interaccion.css?v=6" />
-    <link rel="stylesheet" href="./situacion.css?v=1" />
+    <link rel="stylesheet" href="./situacion.css?v=3" />
   </head>
   <body>
     <aside id="fileEntry" class="file-entry" hidden>
@@ -37,10 +37,10 @@
         const link = document.getElementById("editionLink");
         const edition = new URL(link.href);
         const local = new URL(location.href);
-        for (const name of ["region", "ciudad", "local", "capa", "tema", "tipo", "vigencia", "q", "mapa", "ubigeo", "vista", "peligro"]) {
+        for (const name of ["region", "ciudad", "local", "capa", "tema", "tipo", "vigencia", "q", "mapa", "ubigeo", "vista", "peligro", "aviso"]) {
           if (local.searchParams.has(name)) edition.searchParams.set(name, local.searchParams.get(name));
         }
-        if (["#inicio", "#temperatura", "#avisos", "#fuentes"].includes(local.hash)) edition.hash = local.hash;
+        if (["#inicio", "#temperatura", "#avisos", "#prensa-regional", "#fuentes"].includes(local.hash)) edition.hash = local.hash;
         document.body.classList.add("opening-edition");
         document.getElementById("fileEntry").hidden = false;
         link.href = edition.href;
@@ -198,9 +198,13 @@
         </div>
           <aside class="local-pane" aria-labelledby="placeTitle">
             <nav id="placeTrail" class="place-trail" aria-label="Ruta territorial"></nav>
-            <h2 id="placeTitle" tabindex="-1">Todo el Perú</h2>
+            <div class="place-heading">
+              <h2 id="placeTitle" tabindex="-1">Todo el Perú</h2>
+              <div id="sharePlace"></div>
+            </div>
             <label id="areaSelectLabel" class="area-select" hidden><span id="areaSelectTitle"></span><select id="areaSelect"></select></label>
             <div class="pane-heading"><h3 id="signalsTitle">Reportes del último corte</h3><span id="signalsCount"></span></div>
+            <p id="sourceFreshness" class="source-freshness" hidden></p>
             <div id="localSignals" class="local-signals" aria-live="polite"></div>
             <button type="button" id="allSignals" class="pane-more" hidden>Ver todos los reportes →</button>
             <details id="pastSignals" hidden><summary>Reportes anteriores</summary><div></div></details>
@@ -348,6 +352,22 @@
           Ver más publicaciones
         </button>
       </section>
+      <section class="regional-press" id="prensa-regional" aria-labelledby="regionalPressHeading">
+        <h2 id="regionalPressHeading">Prensa regional y nacional</h2>
+        <p id="regionalPressScope">Cobertura periodística de las últimas 72 horas.</p>
+        <div class="press-groups">
+          <section aria-labelledby="pressLocalHeading">
+            <h3 id="pressLocalHeading">Desde las regiones</h3>
+            <ul id="regionalPressList" class="press-links"></ul>
+            <p id="regionalPressState" class="press-state" role="status">Consultando medios regionales…</p>
+          </section>
+          <section aria-labelledby="pressNationalHeading">
+            <h3 id="pressNationalHeading">Cobertura nacional</h3>
+            <ul id="nationalPressList" class="press-links"></ul>
+            <p id="nationalPressState" class="press-state" role="status">Consultando medios nacionales…</p>
+          </section>
+        </div>
+      </section>
       <section class="sources" id="fuentes">
         <details id="sourceDetails">
           <summary>
@@ -360,6 +380,7 @@
             Cada entidad publica a su propio ritmo. Una consulta reciente puede
             devolver un documento anterior. Revisa la vigencia en el original.
           </p>
+          <div class="edition-controls"><button id="checkEdition" type="button" class="outline-btn">Comprobar última edición</button><a href="https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/horario.yml" target="_blank" rel="noopener">Historial y actualización en GitHub ↗</a></div>
           <p id="publicationStatus" class="subtle" hidden></p>
           <div id="sourceList" class="source-list"></div>
           <h3>Cartografía</h3>
@@ -417,7 +438,7 @@
       <div id="dialogBody"></div>
     </dialog>
     <script type="module">
-      if (location.protocol !== "file:") import("./atlas-app.mjs?v=9");
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=11");
     </script>
   </body>
 </html>

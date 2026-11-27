@@ -1,7 +1,11 @@
 import {mostrarHistoria} from "./historia-comparada.mjs";
-import {explorer} from "./explorar.mjs";
-import {loadTerritories,normalizePlace,noticeCovers} from "./territorios.mjs";
-import { createMap, mapCities } from "./atlas-map.mjs?v=5";
+import {explorer} from "./explorar.mjs?v=3";
+import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs";
+import {shareControl,sharePayload} from "./compartir.mjs";
+import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
+import { createMap, mapCities } from "./atlas-map.mjs?v=6";
+import {editionAsset} from "./publicacion.mjs";
+import {renderRegionalPress} from "./prensa-regional.mjs";
 import {portStatusPanel} from "./puertos.mjs";
 import { layerRecords, noticeForRegionDay } from "./avisos-mapa.mjs?v=3";
 const $ = (id) => document.getElementById(id);
@@ -98,6 +102,7 @@ let panel = null,
   oceanProduct = "",
   oceanSource = null,
   requested = 0,
+  editionReadFailed = false,
   audio = null,
   speaking = false;
 function dateTime(value) {
@@ -367,13 +372,96 @@ function explanationFor(item) {
   }
   return { what, meaning: meaning.trim(), mode: "fuentes" };
 }
+function shareLocation() {
+  return {region, ubigeo, ciudad:selectedCity, capa:layer, vista:mode, peligro:hazard};
+}
+function placeForSharing() {
+  return (ubigeo && catalog?.label(ubigeo)) ||
+    [selectedCity,regionLabel(region)].filter(Boolean).join(" · ") || "Todo el Perú";
+}
+function placePayload() {
+  const place=placeForSharing();
+  const heading=mode==="pronostico" ? "Pronóstico" : "Último corte";
+  const records=localExplorer.current;
+  const first=records[0];
+  const example=first && [first.label,first.title,dateTime(first.at)].filter(Boolean).join(" · ");
+  const situation=records.length
+    ? [records.length+(records.length===1?" reporte en esta vista.":" reportes en esta vista."), example].join(" ")
+    : mode==="pronostico"?"Sin pronóstico publicado con este alcance en la edición consultada.":"Sin reporte reciente para este lugar en la edición consultada.";
+  return sharePayload({...shareLocation(),place,title:place+" · "+layerNames[layer]+" · "+heading,
+    situation:panel?situation:"Consulta la edición disponible en el mapa.",source:"Perú al Día · edición",at:panel?.updatedAt});
+}
+function noticeShare(record) {
+  const container=node("div");
+  // Prepare the identifier before the click so the native share sheet keeps user activation.
+  void avisoKey(record).then(aviso=>{
+    if(!aviso)return;
+    container.replaceChildren(shareControl(()=>{
+      const selection=shareLocation();
+      const recordRegions=record.regions?.length?record.regions:record.region?[record.region]:[];
+      const area=record.area || record.ubigeo;
+      if(!selection.region && recordRegions.length===1) {
+        selection.region=findRegion(recordRegions[0]);
+        if(area && catalog?.regionOf(area)===selection.region)selection.ubigeo=area;
+      }
+      if(record.mode)selection.vista=record.mode;
+      if(record.layer)selection.capa=record.layer;
+      if(record.sourceId==="senamhi-quebradas")selection.peligro="quebradas";
+      const place=[record.locality,record.district,record.province,record.region].filter(Boolean);
+      const selectedCoverage=ubigeo && (record.area===ubigeo || noticeCovers(record.item || record,ubigeo,catalog));
+      const locationLabel=selectedCoverage ? placeForSharing() : [...new Set(place)].join(" · ") || recordRegions.join(", ") || "Perú";
+      const signal=Boolean(record.type && record.mode);
+      const validityText=signal?record.label:record.validUntil || record.withdrawnAt || record.supersededBy?periodNames[validity(record)]:"";
+      const until=record.expiresAt || record.validUntil;
+      const situation=[validityText,until && "Vigencia hasta "+dateTime(until),record.event?.recovery?.text || record.text || record.summary].filter(Boolean).join(" · ");
+      return sharePayload({...selection,aviso,place:locationLabel,title:record.title,situation,
+        source:record.sourceName || record.source || record.sourceId,at:record.issuedAt || record.publishedAt || record.at || record.validFrom});
+    },{label:record.kind==="prensa" || record.event?.kind==="prensa" ? "Compartir noticia" : "Compartir este aviso"}));
+  }).catch(()=>{container.textContent="Enlace de este aviso no disponible.";});
+  return container;
+}
+let openedNotice="";
+let territoriesReady=false;
+let lastShareScope="";
+let initialPressAnchor=location.hash==="#prensa-regional";
+if(initialPressAnchor) {
+  for(const event of ["pointerdown","wheel","keydown"])
+    window.addEventListener(event,()=>{initialPressAnchor=false;},{once:true,passive:true});
+}
+async function openSharedNotice() {
+  const token=new URLSearchParams(location.search).get("aviso");
+  if(!panel || !token || token===openedNotice || (!territoriesReady && ubigeo))return;
+  openedNotice=token;
+  let found;
+  try {
+    found=await resolveAviso(token,{items:panel.items,signals:localExplorer.signals,originals:panel.sharedOriginals});
+  } catch {found={kind:"missing"};}
+  if(openedNotice!==token || new URLSearchParams(location.search).get("aviso")!==token)return;
+  $("infoDialog").dataset.sharedNotice=token;
+  if(found.kind==="signal")return localExplorer.signalDialog(found.record);
+  if(found.kind==="item") {
+    const scoped=region && noticeForRegionDay(found.record,region);
+    return showRecord(scoped || found.record);
+  }
+  if(found.kind==="invalid")return dialog("Enlace compartido","El enlace del aviso está incompleto",
+    node("p","Cierra esta ficha para consultar los reportes disponibles del lugar."));
+  const fields=[node("p","Esta ficha ya no figura en la edición consultada. Puedes cerrar esta ventana y revisar el corte más reciente del mapa.")];
+  if(found.originalUrl)fields.push(link("Consultar la publicación original ↗",found.originalUrl));
+  if(found.sourceDirectoryUrl) {
+    if(found.sourceRecordId)fields.push(node("p","Código del registro · "+found.sourceRecordId));
+    fields.push(link("Consultar el registro de "+found.sourceName+" ↗",found.sourceDirectoryUrl));
+  }
+  dialog("Archivo de avisos","Aviso de una edición anterior",...fields);
+}
 function showRecord(item) {
   const incident=impactOf(item);
   const signal=incident && localExplorer.signals.find(s=>s.event?.id===incident.id);
   if(signal) {localExplorer.signalDialog(signal);return;}
   const fields = [
-    node("p", item.sourceName || item.source || item.sourceId, "record-source"),
+    node("p", item.sourceName || item.source || item.sourceId, "record-source"), noticeShare(item),
   ];
+  if(item.validUntil || item.withdrawnAt || item.supersededBy)
+    fields.push(node("p","Estado del aviso · "+periodNames[validity(item)]));
   if (
     item.kind === "oficial" &&
     (panel?.explanations?.notices?.[item.id] || mapPeriod(item))
@@ -562,7 +650,7 @@ function showRecord(item) {
       link("Ver la guía oficial de INDECI ↗", prepUrl),
     );
   dialog(
-    item.kind === "oficial" ? "Publicación oficial" : "Medios y regiones",
+    item.kind === "oficial" ? "Publicación oficial" : item.kind==="prensa"?"Cobertura periodística":"Medios y regiones",
     item.title,
     ...fields,
   );
@@ -577,6 +665,7 @@ function locatedItem(item) {
   return Boolean(event && catalog?.resolve(event.region,event.province,event.district)?.startsWith(ubigeo));
 }
 function renderItems() {
+  renderRegionalPress({panel,region,showRecord});
   const all = panel?.items || [];
   const subset = fromLayer && region
     ? mappedItems.map((item) => noticeForRegionDay(item, region)).filter(Boolean)
@@ -880,7 +969,12 @@ function syncLayer() {
     }
   }
   map?.select(region, selectedCity);
-  const result=localExplorer.render({panel,items:mappedItems,index:catalog,map,region,area:ubigeo,city:selectedCity,view:mode,layer,hazard});
+  const result=localExplorer.render({panel,items:mappedItems,index:catalog,map,region,area:ubigeo,city:selectedCity,view:mode,layer,hazard,readFailed:editionReadFailed});
+  const shareScope=[region,ubigeo,selectedCity,layer,mode,hazard].join("|");
+  if(shareScope!==lastShareScope) {
+    lastShareScope=shareScope;
+    $("sharePlace").replaceChildren(shareControl(placePayload,{label:"Compartir lugar"}));
+  }
   const modeCounts=new Map();
   for (const signal of result.viewSignals)
     for (const r of signal.region?[signal.region]:(signal.regions || [])) modeCounts.set(r,(modeCounts.get(r)||0)+1);
@@ -906,10 +1000,10 @@ function syncLayer() {
   $("coverageText").textContent = panel ? modeCounts.size+" zonas con reportes" : "Consultando cobertura…";
   const layerSources =
     layer === "mar"
-      ? ["marina", "coen"]
+      ? ["marina", "dicapi", "coen"]
       : layer === "rios"
         ? ["coen", "senamhi-rios"]
-        : ["coen", "senamhi-lluvias", "senamhi-quebradas", "senamhi-meteo"];
+        : mode==="ahora"?["coen","senamhi-radar"]:["senamhi-lluvias", "senamhi-quebradas", "senamhi-meteo"];
   const delayed = (panel?.sources || []).filter(
     (s) => layerSources.includes(s.id) && ["stale", "error"].includes(s.status),
   );
@@ -1171,6 +1265,7 @@ function syncControls() {
 function saveLocation() {
   const url = new URL(location.href);
   const fields = {
+    aviso:"",
     region,
     ciudad: selectedCity,
     local: localOnly ? "1" : "",
@@ -1374,7 +1469,7 @@ function restoreLocation() {
   syncLayer();
   renderItems();
 }
-const localExplorer=explorer({node,link,dialog,dateTime,showRecord,onPlace:(r,id)=>navigateArea(r,id)});
+const localExplorer=explorer({node,link,dialog,dateTime,showRecord,noticeShare,onPlace:(r,id)=>navigateArea(r,id)});
 function navigateArea(r,id) {
   const returnFocus=$("placeTrail").contains(document.activeElement) || document.activeElement===$("areaSelect");
   const old=location.href;
@@ -1390,6 +1485,7 @@ for(const b of document.querySelectorAll("[data-view]")) b.onclick=()=>{
 };
 const placeOptions=new Map();
 void loadTerritories().then(index=>{
+  territoriesReady=true;
   catalog=index;
   for(const p of index.places.filter(p=>p.id.length>2)) {
     const description=index.label(p.id)+" ("+(p.id.length===6?"distrito":"provincia")+")";
@@ -1397,7 +1493,7 @@ void loadTerritories().then(index=>{
   }
   updateSuggestions();
   restoreLocation();
-}).catch(()=>{});
+}).catch(()=>{territoriesReady=true;}).finally(()=>{void openSharedNotice();});
 function updateSuggestions() {
   const q=normalizePlace($("searchInput").value);
   if(!catalog || q.length<2) return;
@@ -1413,7 +1509,13 @@ function updateSuggestions() {
   $("places").replaceChildren(...options);
 }
 $("searchInput").addEventListener("input",updateSuggestions);
-window.addEventListener("popstate", restoreLocation);
+window.addEventListener("popstate", ()=>{
+  openedNotice="";
+  delete $("infoDialog").dataset.sharedNotice;
+  if($("infoDialog").open)$("infoDialog").close();
+  restoreLocation();
+  void openSharedNotice();
+});
 restoreLocation();
 const fallbackSources = [
   ["COEN · INDECI", "https://portal.indeci.gob.pe/emergencias/"],
@@ -1462,6 +1564,14 @@ function renderSources() {
       );
       if (s.lastSuccessAt)
         d.append(node("small", "Última lectura: " + dateTime(s.lastSuccessAt)));
+      if(s.kind==="prensa") {
+        const detail=[s.publisherRegion && "Redacción de "+s.publisherRegion,
+          s.intervalMinutes && "Intervalo previsto de consulta · "+s.intervalMinutes+" min"].filter(Boolean);
+        if(detail.length)d.append(node("small",detail.join(" · ")));
+        const coverage=s.nationalPressCoverage;
+        if(coverage && coverage.channelsRead<coverage.totalChannels)
+          d.append(node("small","Última lectura parcial · "+coverage.channelsRead+" de "+coverage.totalChannels+" canales del medio."));
+      }
       if (s.nowcasting?.observedAt)
         d.append(node("small", "Fecha de la observación en el visor · " + dateTime(s.nowcasting.observedAt)));
       if (s.readChannel === "phisis" || s.readChannel === "web+phisis") {
@@ -1504,7 +1614,7 @@ const fullDate = (day) =>
   }).format(new Date(day + "T12:00:00Z"));
 async function loadWeekly() {
   try {
-    const r = await fetch("./data/temperatura.json", {
+    const r = await fetch(editionAsset("./data/temperatura.json"), {
       cache: "no-cache",
       signal: globalThis.AbortSignal?.timeout?.(8000),
     });
@@ -1704,11 +1814,7 @@ $("listen").onclick = async () => {
     };
     try {
       if (url) {
-        const parsed = new URL(
-          url.startsWith("/") ? "." + url : url,
-          location.href,
-        );
-        if (parsed.origin !== location.origin) throw Error("Audio externo");
+        const parsed = editionAsset(url.startsWith("/") ? "." + url : url);
         audio = new Audio(parsed.href);
         audio.onended = onEnd;
         audio.onerror = onEnd;
@@ -1735,14 +1841,28 @@ $("listen").onclick = async () => {
   play.click();
 };
 $("infoDialog").addEventListener("close", stopAudio);
-async function load() {
+$("infoDialog").addEventListener("close", ()=>{
+  const token=$("infoDialog").dataset.sharedNotice;
+  if($("infoDialog").open || !token)return;
+  delete $("infoDialog").dataset.sharedNotice;
+  const url=new URL(location.href);
+  if(url.searchParams.get("aviso")===token) {
+    url.searchParams.delete("aviso");
+    history.replaceState(null,"",url);
+  }
+  if(openedNotice===token)openedNotice="";
+});
+async function load(forceCheck = false) {
   const run = ++requested;
   const paths = location.hostname.endsWith(".github.io")
     ? ["./data/panorama.json"]
     : ["./api/panorama", "./data/panorama.json"];
   for (const path of paths) {
     try {
-      const res = await fetch(path, {
+      const asset=editionAsset(path);
+      // A shared time bucket keeps the published edition discoverable behind Pages' CDN.
+      if(path.endsWith(".json"))asset.searchParams.set("corte",String(Math.floor(Date.now()/(forceCheck?60000:300000))));
+      const res = await fetch(asset, {
         cache: "no-cache",
         signal: globalThis.AbortSignal?.timeout?.(7500),
       });
@@ -1755,6 +1875,8 @@ async function load() {
       )
         continue;
       if (run !== requested) return;
+      if(panel && Date.parse(data.updatedAt)<Date.parse(panel.updatedAt)) continue;
+      editionReadFailed=false;
       mappedItems = layerRecords(data.items);
       panel = data;
       showEditionTime();
@@ -1762,12 +1884,20 @@ async function load() {
       renderSources();
       renderItems();
       syncLayer();
+      void openSharedNotice();
+      // Rendering the notices above the press moves the initial HTML fragment.
+      if(initialPressAnchor)requestAnimationFrame(()=>{
+        if(initialPressAnchor && location.hash==="#prensa-regional" && !$("infoDialog").open)
+          $("prensa-regional").scrollIntoView({block:"start",behavior:"instant"});
+        initialPressAnchor=false;
+      });
       $("listen").disabled = !audioText() && !data.bulletin?.audioUrl;
       return;
     } catch {}
   }
   if (run !== requested) return;
-  if (panel) showEditionTime(true);
+  editionReadFailed=true;
+  if (panel) {showEditionTime(true);syncLayer();renderItems();}
   else {
     $("snapshotTime").textContent =
       "No se pudo consultar el registro. Fuentes oficiales disponibles abajo.";
@@ -1800,6 +1930,11 @@ createMap({
   .catch(() => {
     $("mapDetails").textContent = "Cartografía no disponible  ⓘ";
   });
+$("checkEdition").onclick=async e=>{
+  const b=e.currentTarget;b.disabled=true;b.textContent="Consultando GitHub…";
+  try{await load(true);}
+  finally{b.disabled=false;b.textContent="Comprobar última edición";}
+};
 let lastRefresh = 0;
 function refreshPage() {
   if (document.hidden || Date.now() - lastRefresh < 60000) return;
@@ -1810,6 +1945,7 @@ function refreshPage() {
 }
 refreshPage();
 setInterval(refreshPage, 5 * 60 * 1000);
+setInterval(()=>{if(!document.hidden && panel){showEditionTime(editionReadFailed);syncLayer();}},60000);
 document.addEventListener("visibilitychange", refreshPage);
 window.addEventListener("online", () => {
   lastRefresh = 0;

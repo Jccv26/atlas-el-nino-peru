@@ -2,16 +2,18 @@ import {noticeForRegionDay} from "./avisos-mapa.mjs?v=3";
 import {activeSchedule, inScope, localSignals} from "./senales.mjs";
 import {regionTitle, normalizePlace} from "./territorios.mjs";
 const $=id=>document.getElementById(id);
-export function explorer({node,link,dialog,dateTime,showRecord,onPlace}) {
-  let current=[],all=[],lastView="",lastResults="",latestPanel,scopeArea="",scopeRegion="",scopeCatalog;
+export function explorer({node,link,dialog,dateTime,showRecord,onPlace,noticeShare}) {
+  let current=[],all=[],lastView="",lastResults="",trailKey="",latestPanel,scopeArea="",scopeRegion="",scopeCatalog;
   const captions={lluvia:"Lluvia medida", impacto:"Impacto reportado", grave:"Impacto grave confirmado", restablecido:"Restablecido",rio:"Estación de río",puerto:"Puerto",pronostico:"Pronóstico"};
   function signalDialog(s) {
     const place=[s.locality || s.station,s.district,s.province,regionTitle(s.region)].filter(Boolean);
     const fields=[node("p",[...new Set(place)].join(" · ") || s.regions?.map(regionTitle).join(", "),"signal-place")];
     if(s.item) {showRecord(s.item);return;}
+    fields.push(noticeShare(s));
     const event=s.event;
     const noteId=event?.itemId || (s.radar || s.type==="observacion" ? latestPanel?.items?.find(it=>it.radarType===(s.type==="observacion"?"observacion":"pronostico") && it.url===s.url && it.region===s.region && it.province===s.province && (!s.locality || it.locality===s.locality))?.id : null);
     const note=latestPanel?.explanations?.notices?.[noteId];
+    if(s.mark==="grave" && event?.severityEvidence)fields.push(node("h3","Por qué se marca en rojo"),node("p",event.severityEvidence.text),link("Evidencia de la afectación ↗",event.severityEvidence.url));
     if(event?.corroboratedClaim)fields.push(node("p",event.corroboratedClaim));
     if(event?.localities?.length)fields.push(node("p","Lugares mencionados · "+event.localities.join(" y ")));
     if(s.text && s.title!==s.text) fields.push(node("p",s.text,"signal-narrative"));
@@ -70,14 +72,24 @@ export function explorer({node,link,dialog,dateTime,showRecord,onPlace}) {
     const container=node("div","","group-signals");container.append(...list.map(row));
     dialog("Consulta territorial",title,container);
   }
-  function render({panel,items,index,map,region,area,city,view,layer,hazard,now=Date.now()}) {
+  function render({panel,items,index,map,region,area,city,view,layer,hazard,readFailed=false,now=Date.now()}) {
     latestPanel=panel;scopeArea=area;scopeRegion=region;scopeCatalog=index;
-    const verified=activeSchedule(panel,now);
+    const verified=!readFailed && activeSchedule(panel,now);
     const stamp=panel?.updatedAt;
-    $("editionLine").textContent=stamp?"Edición del "+dateTime(stamp)+" · hora de Perú"+(now-Date.parse(stamp)>30*60000?" · actualización demorada":""):"Consultando la última edición…";
+    $("editionLine").textContent=stamp?"Edición del "+dateTime(stamp)+" · hora de Perú"+(readFailed?" · pendiente de reconexión":now-Date.parse(stamp)>30*60000?" · actualización demorada":""):"Consultando la última edición…";
     for(const b of document.querySelectorAll("[data-view]")) {
       b.setAttribute("aria-pressed",String(b.dataset.view===view));
       if(b.dataset.view==="ahora")b.textContent=verified?"Ahora":"Último corte";
+    }
+    const clock=$("sourceFreshness");
+    const radar=panel?.radar;
+    const applicableRadar=layer==="lluvias" && view==="ahora" && radar;
+    const last=applicableRadar && [...(radar.reports || [])].sort((a,b)=>b.issuedAt.localeCompare(a.issuedAt))[0];
+    clock.hidden=!applicableRadar;
+    if(applicableRadar) {
+      const mark=[last?"Último parte consultado en el índice nacional de radar · "+dateTime(last.issuedAt):"Sin parte horario de radar disponible",
+        ["stale","partial","unavailable"].includes(radar.status)?"Lectura del radar pendiente de actualización":""].filter(Boolean);
+      clock.textContent=mark.join(". ")+".";
     }
     all=localSignals(panel,items,index,now);
     const viewSignals=all.filter(s=>s.mode===view && s.layer===layer);
@@ -102,7 +114,8 @@ export function explorer({node,link,dialog,dateTime,showRecord,onPlace}) {
     const drawn=current.filter(s=>!s.item?.sectorMap && s.type!=="aviso" && (!s.recent || view==="pronostico" || !current.some(o=>o.id!==s.id && o.type===s.type && o.area===s.area && o.locality===s.locality && Date.parse(o.at)>Date.parse(s.at))));
     map?.local({region,area},drawn,view==="pronostico"?current.filter(s=>s.item?.sectorMap && s.item.sourceId==="senamhi-"+hazard):[],index);
     const root=$("placeTrail"),title=city || (area && index?.byId.get(area)?.name) || regionTitle(region) || "Todo el Perú";
-    root.replaceChildren();
+    const nextTrailKey=[region,area,city,title,Boolean(index)].join("|");
+    if(trailKey!==nextTrailKey){root.replaceChildren();
     const crumb=(text,r,id,isLast=false)=>{
       if(isLast) {const here=node("span",text);here.setAttribute("aria-current","location");root.append(here);return;}
       const b=node("button",text);b.type="button";b.title=!r?"Volver a todo el Perú":!id?"Volver a la región "+text:"Volver a la provincia de "+text;b.setAttribute("aria-label",b.title);b.onclick=()=>onPlace(r,id);root.append(b);
@@ -113,6 +126,7 @@ export function explorer({node,link,dialog,dateTime,showRecord,onPlace}) {
       if(area.length>=4 && !(region==="Lima Metropolitana" && area==="1501")) crumb(index.byId.get(area.slice(0,4))?.name || area.slice(0,4), region,area.slice(0,4),area.length===4);
       if(area.length===6) crumb(title,region,area,true);
     } else if(city) crumb(city,region,"",true);
+    trailKey=nextTrailKey;}
     $("placeTitle").textContent=title;
     const available=index?.children(region,area) || [];
     const select=$("areaSelect");
@@ -151,5 +165,5 @@ export function explorer({node,link,dialog,dateTime,showRecord,onPlace}) {
     lastView=viewKey;
     return {current,viewSignals:viewSignals.filter(isRecent)};
   }
-  return {render,group,signalDialog,get signals(){return all;}};
+  return {render,group,signalDialog,get signals(){return all;},get current(){return current;}};
 }

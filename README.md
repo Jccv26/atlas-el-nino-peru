@@ -51,7 +51,7 @@ Guardar el vencimiento del período de crédito confirmado en la variable de Act
 
 ### Fuentes y archivos
 
-- `lib/oficiales.mjs` y `lib/medios.mjs` definen los canales, sus intervalos de consulta y los formatos aceptados.
+- `lib/oficiales.mjs`, `lib/medios.mjs` y `lib/medios-nacionales.mjs` definen los canales, sus intervalos de consulta y los formatos aceptados. La sección de prensa enlaza notas de las últimas 72 horas e identifica la redacción, la fecha y el lugar mencionado.
 - `lib/panorama.mjs` construye el registro y conserva la procedencia, las revisiones y las fechas de los avisos.
 - `lib/boletines.mjs` prepara las ediciones, verifica el audio y limita los intentos con reservas persistentes.
 - `public/atlas/` contiene cartografía, cuadrícula NOAA y créditos.

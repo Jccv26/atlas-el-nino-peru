@@ -119,3 +119,80 @@
 @media(max-width:760px){.hazard-choice{top:46px;right:9px}}
 #pastSignals {margin-top:14px;border-top:1px solid #37565a;padding-top:10px}
 #pastSignals summary {color:#bfd7cf;font-size:13px;cursor:pointer}
+.source-freshness{font:400 12px/1.45 Instrument,Arial,sans-serif;color:#bed1c9;margin:6px 0 3px}
+.edition-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin:12px 0}
+.edition-controls a{color:inherit;text-decoration:underline}
+
+.place-heading {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  margin:5px 0 14px;
+}
+.place-heading h2 {flex:1 1 8rem;min-width:0;overflow-wrap:anywhere;margin:0}
+.place-heading #sharePlace {min-width:0;max-width:100%}
+.place-heading:has(.share-status:not(:empty)) #sharePlace {flex:1 1 100%}
+.share-control {display:grid;min-width:0;justify-items:start;max-width:100%}
+.share-control .share-button,
+.share-control .share-copy {
+  max-width:100%;
+  min-height:44px;
+  padding:7px 14px;
+  border-radius:24px;
+  font:600 13px/1.35 Instrument,Arial,sans-serif;
+  cursor:pointer;
+}
+.share-control .share-button {
+  border:1px solid #77988e;
+  color:#c9f4df;
+  background:#1b3d3d;
+}
+.share-control .share-button:hover {background:#28534c;border-color:#a4d5bb}
+.share-control .share-copy {color:#b8f0d8;text-decoration:underline;text-underline-offset:3px;padding-inline:4px}
+.share-control .share-copy[hidden],.share-manual:empty {display:none}
+.share-control :is(button,input):focus-visible {outline:3px solid #edda94;outline-offset:2px}
+.share-status:not(:empty),.share-manual label {display:block;font-size:13px;line-height:1.5;color:#d1e7dc;margin-top:5px}
+.share-manual {width:100%;min-width:0}
+.share-manual input {
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  margin:4px 0 3px;
+  padding:7px 10px;
+  border:1px solid #77988e;
+  border-radius:7px;
+  background:#102d31;
+  color:#f0f7ef;
+  font:400 16px/1.4 Instrument,Arial,sans-serif;
+}
+#infoDialog .share-control {margin:14px 0}
+@media(forced-colors:active) {
+  .share-control :is(button,input):focus-visible {outline-color:Highlight}
+}
+
+.regional-press {max-width:1440px;margin:0 auto;padding:18px var(--edge) 30px;color:var(--paper)}
+.regional-press h2 {margin:0;font-size:clamp(23px,2.3vw,32px);line-height:1.2;letter-spacing:-.035em}
+.regional-press > p {margin:6px 0 14px;color:#b2c9c6;font-size:14px;line-height:1.5}
+.press-groups {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px clamp(20px,4vw,60px)}
+.press-groups > section {min-width:0}
+.press-groups h3 {margin:4px 0 9px;color:#d8e9df;font-size:18px;line-height:1.35;font-weight:620}
+.press-links {margin:0;padding:0;list-style:none;display:grid}
+.press-links li {min-width:0;padding:13px 0 7px;border-top:1px solid #405b5e}
+.regional-byline,.regional-meta {display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;margin:0}
+.regional-byline {font-size:12px;line-height:1.5;color:#adbfbd}
+.regional-byline strong {color:#a9e3cf;font-weight:600}
+.regional-byline time {font-variant-numeric:tabular-nums}
+.press-links li > a {display:block;margin:3px 0;color:#edf4ec;font:600 16px/1.4 Instrument,Arial,sans-serif;text-decoration:underline;text-decoration-color:#648781;text-underline-offset:4px;overflow-wrap:anywhere}
+.press-links li > a:hover,.regional-meta button:hover {color:#b9f5dc}
+.regional-meta {color:#bdccc9;font-size:12px;line-height:1.45}
+.regional-meta button {color:#a7e5d2;padding:7px 2px;min-height:38px;text-decoration:underline;text-underline-offset:3px}
+.regional-press :is(a,button):focus-visible {outline:3px solid #edda94;outline-offset:2px}
+.press-state:not([hidden]) {padding:12px 0;border-top:1px solid #405b5e}
+@media(max-width:760px) {
+  .regional-press {padding:15px var(--edge) 24px}
+  .press-groups {grid-template-columns:minmax(0,1fr)}
+  .regional-meta button {min-height:44px}
+}

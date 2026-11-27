@@ -1,5 +1,6 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
-import {localMap} from "./mapa-local.mjs";
+import {localMap} from "./mapa-local.mjs?v=2";
+import {editionAsset} from "./publicacion.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
 const svg = (tag, props = {}) => {
   const n = document.createElementNS(svgNS, tag);
@@ -831,7 +832,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     a.length === b.length && a.every((v, i) => v === b[i]);
   async function updateOcean() {
     try {
-      const response = await fetch("./atlas/oceano.json", {
+      const response = await fetch(editionAsset("./atlas/oceano.json"), {
         ...opt,
         cache: "no-cache",
         headers: oceanValidator,
