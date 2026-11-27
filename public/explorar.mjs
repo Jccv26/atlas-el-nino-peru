@@ -2,13 +2,13 @@ import {noticeForRegionDay} from "./avisos-mapa.mjs?v=3";
 import {activeSchedule, inScope, localSignals} from "./senales.mjs";
 import {regionTitle, normalizePlace} from "./territorios.mjs";
 const $=id=>document.getElementById(id);
-export function explorer({node,link,dialog,dateTime,showRecord,onPlace,noticeShare}) {
+export function explorer({node,link,dialog,recordDialog,dateTime,showRecord,onPlace,noticeShare}) {
   let current=[],all=[],lastView="",lastResults="",trailKey="",latestPanel,scopeArea="",scopeRegion="",scopeCatalog;
   const captions={lluvia:"Lluvia medida", impacto:"Impacto reportado", grave:"Impacto grave confirmado", restablecido:"Restablecido",rio:"Estación de río",puerto:"Puerto",pronostico:"Pronóstico"};
-  function signalDialog(s) {
+  function signalDialog(s,fromLink=false) {
     const place=[s.locality || s.station,s.district,s.province,regionTitle(s.region)].filter(Boolean);
     const fields=[node("p",[...new Set(place)].join(" · ") || s.regions?.map(regionTitle).join(", "),"signal-place")];
-    if(s.item) {showRecord(s.item);return;}
+    if(s.item) {showRecord(s.item,fromLink);return;}
     fields.push(noticeShare(s));
     const event=s.event;
     const noteId=event?.itemId || (s.radar || s.type==="observacion" ? latestPanel?.items?.find(it=>it.radarType===(s.type==="observacion"?"observacion":"pronostico") && it.url===s.url && it.region===s.region && it.province===s.province && (!s.locality || it.locality===s.locality))?.id : null);
@@ -54,7 +54,7 @@ export function explorer({node,link,dialog,dateTime,showRecord,onPlace,noticeSha
       for (const rec of event.recommendations) fields.push(node("p",rec.text),link(rec.source+" ↗",rec.url));
     }
     if(s.url)fields.push(link("Abrir publicación de "+s.source+" ↗",s.url));
-    dialog(s.label,s.title,...fields);
+    recordDialog(s,fromLink,s.label,s.title,...fields);
   }
   function row(s) {
     const b=node("button","","signal-row "+s.mark);

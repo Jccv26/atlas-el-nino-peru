@@ -1,5 +1,5 @@
 import {mostrarHistoria} from "./historia-comparada.mjs";
-import {explorer} from "./explorar.mjs?v=3";
+import {explorer} from "./explorar.mjs?v=4";
 import {loadTerritories,normalizePlace,noticeCovers,regionTitle} from "./territorios.mjs";
 import {shareControl,sharePayload} from "./compartir.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
@@ -144,11 +144,28 @@ function link(text, url) {
   }
   return a;
 }
+let dialogRequest = 0;
 function dialog(kind, title, ...content) {
+  dialogRequest++;
   $("dialogKind").textContent = kind;
   $("dialogTitle").textContent = title;
   $("dialogBody").replaceChildren(...content);
   if (!$("infoDialog").open) $("infoDialog").showModal();
+}
+async function recordDialog(record, fromLink, ...content) {
+  if (fromLink) return dialog(...content);
+  const request = ++dialogRequest;
+  const before = location.href;
+  const token = await avisoKey(record).catch(() => "");
+  if (request !== dialogRequest || location.href !== before) return;
+  if (token) {
+    const url = new URL(before);
+    url.searchParams.set("aviso", token);
+    if (url.href !== before) history.pushState({atlasNotice:token}, "", url);
+    $("infoDialog").dataset.sharedNotice = token;
+    openedNotice = token;
+  }
+  dialog(...content);
 }
 $("closeDialog").onclick = () => {
   stopAudio();
@@ -438,10 +455,10 @@ async function openSharedNotice() {
   } catch {found={kind:"missing"};}
   if(openedNotice!==token || new URLSearchParams(location.search).get("aviso")!==token)return;
   $("infoDialog").dataset.sharedNotice=token;
-  if(found.kind==="signal")return localExplorer.signalDialog(found.record);
+  if(found.kind==="signal")return localExplorer.signalDialog(found.record,true);
   if(found.kind==="item") {
     const scoped=region && noticeForRegionDay(found.record,region);
-    return showRecord(scoped || found.record);
+    return showRecord(scoped || found.record,true);
   }
   if(found.kind==="invalid")return dialog("Enlace compartido","El enlace del aviso está incompleto",
     node("p","Cierra esta ficha para consultar los reportes disponibles del lugar."));
@@ -453,10 +470,10 @@ async function openSharedNotice() {
   }
   dialog("Archivo de avisos","Aviso de una edición anterior",...fields);
 }
-function showRecord(item) {
+function showRecord(item, fromLink=false) {
   const incident=impactOf(item);
   const signal=incident && localExplorer.signals.find(s=>s.event?.id===incident.id);
-  if(signal) {localExplorer.signalDialog(signal);return;}
+  if(signal) {localExplorer.signalDialog(signal,fromLink);return;}
   const fields = [
     node("p", item.sourceName || item.source || item.sourceId, "record-source"), noticeShare(item),
   ];
@@ -649,7 +666,7 @@ function showRecord(item) {
       ),
       link("Ver la guía oficial de INDECI ↗", prepUrl),
     );
-  dialog(
+  recordDialog(item,fromLink,
     item.kind === "oficial" ? "Publicación oficial" : item.kind==="prensa"?"Cobertura periodística":"Medios y regiones",
     item.title,
     ...fields,
@@ -1469,7 +1486,7 @@ function restoreLocation() {
   syncLayer();
   renderItems();
 }
-const localExplorer=explorer({node,link,dialog,dateTime,showRecord,noticeShare,onPlace:(r,id)=>navigateArea(r,id)});
+const localExplorer=explorer({node,link,dialog,recordDialog,dateTime,showRecord,noticeShare,onPlace:(r,id)=>navigateArea(r,id)});
 function navigateArea(r,id) {
   const returnFocus=$("placeTrail").contains(document.activeElement) || document.activeElement===$("areaSelect");
   const old=location.href;
@@ -1510,6 +1527,7 @@ function updateSuggestions() {
 }
 $("searchInput").addEventListener("input",updateSuggestions);
 window.addEventListener("popstate", ()=>{
+  dialogRequest++;
   openedNotice="";
   delete $("infoDialog").dataset.sharedNotice;
   if($("infoDialog").open)$("infoDialog").close();
@@ -1842,13 +1860,21 @@ $("listen").onclick = async () => {
 };
 $("infoDialog").addEventListener("close", stopAudio);
 $("infoDialog").addEventListener("close", ()=>{
+  if($("infoDialog").open)return;
+  dialogRequest++;
   const token=$("infoDialog").dataset.sharedNotice;
-  if($("infoDialog").open || !token)return;
+  if(!token)return;
   delete $("infoDialog").dataset.sharedNotice;
   const url=new URL(location.href);
   if(url.searchParams.get("aviso")===token) {
-    url.searchParams.delete("aviso");
-    history.replaceState(null,"",url);
+    if(history.state?.atlasNotice===token) {
+      // The visitor opened the notice here. Return to that list or map entry.
+      history.back();
+    } else {
+      // A shared link can be the first page in a tab.
+      url.searchParams.delete("aviso");
+      history.replaceState(history.state,"",url);
+    }
   }
   if(openedNotice===token)openedNotice="";
 });
