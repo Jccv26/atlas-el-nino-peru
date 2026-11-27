@@ -167,10 +167,33 @@ async function recordDialog(record, fromLink, ...content) {
   }
   dialog(...content);
 }
-$("closeDialog").onclick = () => {
-  stopAudio();
-  $("infoDialog").close();
-};
+let leavingNotice = false;
+function dismissDialog() {
+  const modal = $("infoDialog");
+  const token = modal.dataset.sharedNotice;
+  const url = new URL(location.href);
+  dialogRequest++;
+  if (token && url.searchParams.get("aviso") === token) {
+    if (history.state?.atlasNotice === token) {
+      // Keep the dialog open until popstate restores the map. A deferred
+      // traversal after closing can displace the visitor's next navigation.
+      if (!leavingNotice) history.back();
+      leavingNotice = true;
+      return;
+    }
+    // A direct link can be the first page in the tab.
+    url.searchParams.delete("aviso");
+    history.replaceState(history.state, "", url);
+  }
+  delete modal.dataset.sharedNotice;
+  openedNotice = "";
+  modal.close();
+}
+$("closeDialog").onclick = dismissDialog;
+$("infoDialog").addEventListener("cancel", e => {
+  e.preventDefault();
+  dismissDialog();
+});
 $("infoDialog").addEventListener("click", (e) => {
   const r = $("infoDialog").getBoundingClientRect();
   if (
@@ -180,7 +203,7 @@ $("infoDialog").addEventListener("click", (e) => {
       e.clientY < r.top ||
       e.clientY > r.bottom)
   )
-    $("infoDialog").close();
+    dismissDialog();
 });
 function topics(item) {
   const t = fold(
@@ -1528,6 +1551,7 @@ function updateSuggestions() {
 $("searchInput").addEventListener("input",updateSuggestions);
 window.addEventListener("popstate", ()=>{
   dialogRequest++;
+  leavingNotice=false;
   openedNotice="";
   delete $("infoDialog").dataset.sharedNotice;
   if($("infoDialog").open)$("infoDialog").close();
@@ -1859,25 +1883,6 @@ $("listen").onclick = async () => {
   play.click();
 };
 $("infoDialog").addEventListener("close", stopAudio);
-$("infoDialog").addEventListener("close", ()=>{
-  if($("infoDialog").open)return;
-  dialogRequest++;
-  const token=$("infoDialog").dataset.sharedNotice;
-  if(!token)return;
-  delete $("infoDialog").dataset.sharedNotice;
-  const url=new URL(location.href);
-  if(url.searchParams.get("aviso")===token) {
-    if(history.state?.atlasNotice===token) {
-      // The visitor opened the notice here. Return to that list or map entry.
-      history.back();
-    } else {
-      // A shared link can be the first page in a tab.
-      url.searchParams.delete("aviso");
-      history.replaceState(history.state,"",url);
-    }
-  }
-  if(openedNotice===token)openedNotice="";
-});
 async function load(forceCheck = false) {
   const run = ++requested;
   const paths = location.hostname.endsWith(".github.io")
