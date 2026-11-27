@@ -3,8 +3,14 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '3-59/10 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
+    inputs:
+      contrastar_rutas:
+        description: Comprobar las rutas públicas de avisos hidrológicos desde el servidor
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 concurrency:
@@ -36,6 +42,20 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Contrastar el índice y los visores públicos de SENAMHI
+        if: inputs.contrastar_rutas == true
+        run: |
+          diagnostico() {
+            local codigo
+            codigo=$(curl -sS --fail --max-time 14 --output "$RUNNER_TEMP/ruta-senamhi" --write-out '%{http_code}' "$2") || true
+            echo "$1 HTTP ${codigo:-000}"
+            if [[ "$codigo" == 200 ]]; then
+              node -e 'const s=require("node:fs").readFileSync(process.argv[1],"utf8");try{const j=JSON.parse(s);console.log("Registros en la capa",j.features?.length??j.length??0)}catch{console.log("Contiene tabla de avisos",/<th[^>]*>Aviso</i.test(s))}' "$RUNNER_TEMP/ruta-senamhi"
+            fi
+          }
+          diagnostico "Índice nacional de avisos" 'https://www.senamhi.gob.pe/?p=avisos-hidrologicos'
+          diagnostico "Capa publicada por IDESEP" 'https://idesep.senamhi.gob.pe/geoserver/g_dbphisis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=g_dbphisis%3Aaviso_hidro_pub&outputFormat=application%2Fjson'
+          diagnostico "Consulta de avisos del visor PHISIS" 'https://www.senamhi.gob.pe/mapas/mapa-aviso-hidro/include/ajaxIdesepWFSAvisos.php'
       - name: Preparar la lectura de boletines oficiales en PDF
         run: |
           if ! command -v pdftotext >/dev/null; then
