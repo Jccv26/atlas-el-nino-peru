@@ -1,4 +1,5 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
+import {localMap} from "./mapa-local.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
 const svg = (tag, props = {}) => {
   const n = document.createElementNS(svgNS, tag);
@@ -95,7 +96,7 @@ export const mapCities = labelData
 // size in screen pixels as the user moves between national and regional views.
 function createCamera(map, onDraw) {
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  const maxZoom = 9;
+  const maxZoom = 130;
   let width,
     height,
     baseHeight,
@@ -156,7 +157,7 @@ function createCamera(map, onDraw) {
         ? Math.max(22, 20.7 / ratio)
         : Math.min(22.7, Math.max(20.4, 49 / ratio));
     home = {
-      x: width < 761 ? 31 : 45 - (baseHeight * ratio) / 2,
+      x: 30.3,
       y: width < 761 ? 15 : 14.65,
       z: 1,
     };
@@ -184,17 +185,17 @@ function createCamera(map, onDraw) {
       )
         move({ x: point.x, y: point.y, z: Math.min(state.z, 3) });
     },
-    fit(box) {
+    fit(box, local = false) {
       // At wider widths the climate and region cards flank the open map.
-      const available = width >= 1000 ? 0.43 : 0.67;
+      const available = local ? 0.76 : 0.68;
       const z = nearest(
         Math.min(
           (((baseHeight * width) / height) * available) /
-            Math.max(0.1, box.width),
-          (baseHeight * 0.62) / Math.max(0.1, box.height),
+            Math.max(0.015, box.width),
+          (baseHeight * 0.62) / Math.max(0.015, box.height),
         ),
         1.3,
-        7,
+        local ? maxZoom : 12,
       );
       move({ x: box.x + box.width / 2, y: box.y + box.height / 2, z });
     },
@@ -315,7 +316,7 @@ function oceanCell(grid, point) {
   if (!Number.isFinite(value)) return null;
   return { x: lons[col] + 105, y: 6 - lats[row], value };
 }
-export async function createMap({ onRegion, onOceanReady }) {
+export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
   const map = $("map"),
     frame = map.parentElement,
     geo = await fetch("./atlas/geografia.json", opt).then((r) => {
@@ -513,8 +514,10 @@ export async function createMap({ onRegion, onOceanReady }) {
       "translate(" + point.x + " " + point.y + ") scale(" + unit + ")",
     );
   }
+  let localOverlay;
   function paintMarks(nextUnit) {
     unit = nextUnit;
+    localOverlay?.scale(unit);
     compactTags.forEach(({ name, group, bounds }) => {
       pin(group, anchors.get(name));
       // Hiding the entire group also removes its larger transparent touch target.
@@ -531,6 +534,8 @@ export async function createMap({ onRegion, onOceanReady }) {
     if (keyboardRegion) focusTip(keyboardRegion);
   }
   const camera = createCamera(map, paintMarks);
+  localOverlay=localMap({world:$("mapWorld"),fit:box=>camera.fit(box,true),fitRegion:name=>{if(regions.has(name))camera.fit(regions.get(name).getBBox());},onArea,onGroup});
+  localOverlay.scale(unit);
   frame.classList.add("atlas-map-ready");
 
   function status(name) {
@@ -809,6 +814,9 @@ export async function createMap({ onRegion, onOceanReady }) {
       skipClick = false;
       return;
     }
+    if (e.target.closest(".signal-pin")) return;
+    const area = e.target.closest("[data-area]")?.dataset.area;
+    if (area) {hideTip();onArea(area);return;}
     const target = e.target.closest("[data-region]")?.dataset;
     const name = target?.region;
     if (name) {
@@ -899,6 +907,12 @@ export async function createMap({ onRegion, onOceanReady }) {
   refreshOcean();
   return {
     refreshOcean,
+    local(scope, signals, notices, index) {
+      void localOverlay.scope(scope.region,scope.area,index);
+      localOverlay.markers(signals,index,name=>anchors.get(name),scope);
+      void localOverlay.sectors(notices,Date.now());
+      frame.classList.toggle("has-local-area",Boolean(scope.area));
+    },
     regionNames: names,
     select,
     showLayer(nextLayer, nextCounts, options = {}) {

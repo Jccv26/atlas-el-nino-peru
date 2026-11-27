@@ -29,7 +29,7 @@ if(process.argv.includes('--actualizar')) {
   async function tick(){
     if (running) return;
     running = true;
-    try {await actualizar();} catch {console.error('Consulta pendiente; se conserva la edición publicada.');}
+    try {await actualizar({ai:false});} catch {console.error('Consulta pendiente; se conserva la edición publicada.');}
     finally {running=false;}
   }
   void tick();

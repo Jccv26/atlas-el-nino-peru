@@ -1,0 +1,121 @@
+#inicio {background:#0d2228;color:#edf6ef;padding:0 var(--edge) 0}
+.situation-header,.explorer,.map-key {max-width:1620px;margin:0 auto}
+.situation-header {display:flex;justify-content:space-between;align-items:center;gap:22px;padding:26px 0 20px}
+.situation-header h1 {font-size:clamp(27px,3.25vw,46px);letter-spacing:-.055em;line-height:1.04;margin:0 0 7px;font-weight:620}
+.situation-header p {color:#aec4c4;font-size:13px;margin:0;font-variant-numeric:tabular-nums}
+.view-switch {display:inline-flex;padding:4px;border:1px solid #486168;background:#122d34;border-radius:24px;align-self:center;flex-shrink:0}
+.view-switch button {padding:8px 17px;font-weight:620;border-radius:18px;font-size:13px;color:#c4d4d0}
+.view-switch button[aria-pressed=true] {background:#a2ead4;color:#0d302b}
+.explorer {display:grid;grid-template-columns:minmax(0,1fr) clamp(298px,27%,410px);border:1px solid #486269;border-radius:16px;overflow:hidden;background:#102930}
+.explorer .map-frame,.explorer .map-frame.has-region {height:clamp(501px,64vh,720px);min-height:0}
+.explorer .map-head {top:15px;left:15px;right:15px;gap:10px;flex-wrap:wrap}
+.explorer .map-legend {bottom:15px;left:15px;max-width:240px}
+.explorer .map-tools,.explorer .has-region .map-tools{right:15px;bottom:15px}
+.explorer #mapHint {display:none}
+.local-pane {min-width:0;background:linear-gradient(165deg,#163337,#10292e 40%,#10282e);border-left:1px solid #476369;padding:20px clamp(16px,2vw,30px);height:clamp(501px,64vh,720px);overflow:auto;scrollbar-color:#557470 transparent;overscroll-behavior:contain}
+.place-trail {display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;line-height:1.6;color:#add3c9}
+.place-trail > *:not(:last-child)::after {content:"›";margin-left:6px;color:#86a6a4}
+.place-trail button {color:#a6ecd4;text-decoration:underline;text-underline-offset:3px;font:inherit;padding:1px 0}
+.local-pane h2 {font-size:clamp(27px,2.5vw,39px);letter-spacing:-.045em;margin:6px 0 14px;line-height:1.13}
+.area-select {display:grid;gap:4px;margin:0 0 14px}
+.area-select span {color:#b3cac4;font-size:12px}
+.area-select select {width:100%;border:1px solid #567675;border-radius:8px;background:#16363c;color:#edf6f1;padding:8px;font:inherit;font-size:14px}
+.pane-heading {display:flex;justify-content:space-between;align-items:center;border-top:1px solid #436268;padding-top:16px}
+.pane-heading h3 {font-size:14px;line-height:1.4;margin:0;font-weight:650}
+.pane-heading > span {font-variant-numeric:tabular-nums;color:#a5c5bf;font-size:13px}
+.local-signals,.group-signals {display:grid}
+.signal-row {display:grid;gap:4px;width:100%;padding:12px 2px;text-align:left;border-bottom:1px solid #39575b;color:inherit;line-height:1.35}
+.signal-row:hover,.signal-row:focus-visible {background:#528a7a22}
+.signal-row strong {color:#ebf7f0;font-size:15px;line-height:1.35;font-weight:590}
+.signal-row small,.signal-kicker,.map-key {font-size:12px}
+.signal-row small {color:#b4c9c5}
+.signal-kicker,.map-key > span {display:inline-flex;align-items:center;gap:8px}
+.signal-kicker {color:#b9dcd1}
+.signal-empty {color:#c1d4cf;font-size:15px;padding:10px 0}
+.pane-more,.place-choice {text-align:left;padding:10px 0;color:#a2eacb;text-decoration:underline;text-underline-offset:3px}
+#regionalContext {margin:15px 0;color:#bfd7cf;font-size:13px}
+#regionalContext > summary {cursor:pointer}
+.local-pane .region-card:not([hidden]) {position:static;overflow:visible;height:auto;max-height:none;width:100%;max-width:none;margin:12px 0 0;border:0;border-radius:0;transform:none;padding:0;background:none;box-shadow:none}
+.local-pane .region-actions {position:static;padding:0;margin:0;background:none}
+#regionalContext .close {display:none}
+.map-key {display:flex;align-items:center;flex-wrap:wrap;gap:10px 19px;padding:13px 2px 19px;color:#cddecf}
+.map-key small {color:#a4b9b6;font-size:11px}
+.symbol {--tone:#f0be68;width:10px;height:10px;display:inline-block;background:var(--tone);flex:none}
+.lluvia {--tone:#86caff}.rio {--tone:#73d8d1}.impacto {--tone:#ffc063}.grave {--tone:#ff7269}.restablecido {--tone:#98d8ad}.puerto {--tone:#d8baf6}.pronostico {--tone:#d6c597}
+.symbol.lluvia {border-radius:60% 0 60% 60%;transform:rotate(-45deg);width:9px;height:9px}
+.symbol.rio,.symbol.puerto,.symbol.restablecido {border-radius:50%}
+.symbol.impacto,.symbol.grave {clip-path:polygon(50% 0%,100% 100%,0 100%)}
+.symbol.pronostico {transform:rotate(45deg);width:8px;height:8px}
+#map .local-area {fill:#a1e3d50a;stroke:#ccefe2ce;stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer}
+#map .local-area:hover,#map .local-area.is-selected {fill:#8ae7c935;stroke:#d1f9ea;stroke-width:2}
+.hazard-polygons {pointer-events:none}
+.hazard-polygons path {stroke:none;opacity:.68}
+.sector-rojo {fill:#e6635c}.sector-naranja {fill:#eea45c}.sector-amarillo {fill:#e5cf74}
+.signal-pin {outline:none;cursor:pointer}
+.signal-pin .pin-ground {fill:#102e34;stroke:var(--tone);stroke-width:1.7}
+.signal-pin.old .pin-ground {stroke-dasharray:2 1.5}
+.signal-pin .pin-hit {fill:transparent}
+.signal-pin .pin-symbol {fill:var(--tone);stroke:var(--tone);stroke-width:1.3}
+.signal-pin:is(.rio,.restablecido,.puerto) .pin-symbol {fill:none;stroke-width:2}
+.signal-pin .pin-badge {fill:#d9e9df;stroke:#203c3c}
+.signal-pin text {fill:#14352e;font:700 7px Instrument,Arial,sans-serif}
+.signal-pin:hover .pin-ground,.signal-pin:focus-visible .pin-ground {stroke:#fff;stroke-width:3}
+.has-local-area .atlas-marker,.has-local-area .atlas-outline {visibility:hidden}
+.climate-context {background:#142f34;color:#edf3ed;display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,5vw,100px);padding:26px var(--edge);border-top:1px solid #38595b}
+.climate-context .climate-card {display:block;position:static;transform:none;width:auto;max-width:none;background:none;border:0;box-shadow:none;padding:0;color:inherit}
+.climate-context h2 {line-height:1.2;margin:6px 0;font-size:22px;letter-spacing:-.025em}
+.climate-context .climate-card .card-icon {display:none}
+.climate-context .climate-card .magnitude {font-size:21px;margin:2px 0}
+.climate-context p {font-size:14px;line-height:1.5;color:#c4d4d1;margin:4px 0}
+.climate-context .climate-card a {display:inline-flex;padding:5px 0;gap:10px}
+.history-copy button {margin-top:10px}
+#infoDialog .signal-row strong {color:inherit}
+#infoDialog .signal-row small,#infoDialog .signal-row .signal-kicker {color:var(--muted,#abc8c1)}
+#infoDialog .signal-place {color:#99ddcb;font-size:14px}
+.record-timeline {padding:10px 0}.record-timeline summary {cursor:pointer;font-weight:600}
+.record-timeline li {margin:9px 0}
+@media(prefers-reduced-motion:no-preference){
+  .pin-glyph {animation:pin-arrival .28s cubic-bezier(.22,.65,.35,1) both}
+  .local-boundaries path,.hazard-polygons path {animation:boundary-arrival .28s ease-out both}
+  .view-switch button,.signal-row {transition:background-color .22s,color .22s}
+  @keyframes pin-arrival {from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+  @keyframes boundary-arrival {from{opacity:.2}to{opacity:1}}
+}
+@media(max-width:900px) and (min-width:761px){
+  .explorer {grid-template-columns:minmax(0,1fr) 275px}
+  .explorer .map-head{left:8px;right:8px}.explorer .map-legend{max-width:190px}
+}
+@media(max-width:760px){
+  #inicio {padding:0}.situation-header{padding:17px 15px 13px;gap:8px;flex-wrap:wrap}
+  .situation-header h1{font-size:27px}.situation-header p{font-size:11px}
+  .view-switch{padding:3px}.view-switch button{padding:7px 10px;font-size:12px}
+  .explorer{display:block;border:0;border-radius:0}
+  .explorer .map-frame,.explorer .map-frame.has-region{height:auto;min-height:0}
+  .explorer #map {height:clamp(285px,49svh,440px)}
+  .explorer .map-head{top:9px;left:9px;right:9px;flex-wrap:nowrap}
+  .explorer .map-legend{min-width:0;max-width:none;padding:7px 12px}
+  .local-pane{height:auto;overflow:visible;border:0;border-top:1px solid #476369;padding:17px 16px}
+  .local-pane h2{margin-bottom:10px}.local-signals .signal-row{padding:9px 0}
+  .map-key{padding:10px 16px 16px;gap:7px 13px}
+  .climate-context{grid-template-columns:1fr;gap:20px;padding:20px 16px}
+  .climate-context .climate-card .card-top,.climate-context .climate-card #outlook {display:block}
+}
+.history-comparison {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(205px,100%),1fr));gap:12px}
+.history-period {padding:12px;border:1px solid #58716c;border-radius:8px;min-width:0}
+.history-period-head {display:flex;align-items:center;justify-content:space-between;gap:5px}
+.history-period svg {color:#70cdb8;display:block}
+.history-peak,.history-range,.history-weeks {font-variant-numeric:tabular-nums}
+.history-period input[type=range]{width:100%;accent-color:#66cbb1}
+.history-sources {display:grid;gap:5px}
+.hazard-choice{position:absolute;z-index:2;top:60px;right:15px;display:flex;gap:2px;border:1px solid #77918c;border-radius:8px;padding:3px;background:#102930ed}
+.hazard-choice button{padding:5px 9px;border-radius:5px;color:#d5e7db;font-size:12px}
+.hazard-choice button[aria-pressed=true]{background:#d0dfc3;color:#244036}
+.map-key .level-dot{height:9px;width:15px;border-radius:2px}
+.level-dot.amarillo{background:#efd979}.level-dot.naranja{background:#eea763}.level-dot.rojo{background:#eb7669}
+.hazard-polygons path{opacity:.49}
+#map .area-label{font:560 11px Instrument,Arial,sans-serif;fill:#e3f2dd;paint-order:stroke;stroke:#1b3d3c;stroke-width:2.4;stroke-linejoin:round;pointer-events:none}
+#map .area-label.current{font-size:15px;fill:#fff;stroke-width:3;letter-spacing:.1px}
+#map .local-area.is-selected{fill:#a3ffcf0a;stroke:#ecffdb;stroke-width:2.6}
+@media(max-width:760px){.hazard-choice{top:46px;right:9px}}
+#pastSignals {margin-top:14px;border-top:1px solid #37565a;padding-top:10px}
+#pastSignals summary {color:#bfd7cf;font-size:13px;cursor:pointer}

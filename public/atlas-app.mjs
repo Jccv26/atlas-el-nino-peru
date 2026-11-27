@@ -1,4 +1,7 @@
-import { createMap, mapCities } from "./atlas-map.mjs?v=4";
+import {mostrarHistoria} from "./historia-comparada.mjs";
+import {explorer} from "./explorar.mjs";
+import {loadTerritories,normalizePlace,noticeCovers} from "./territorios.mjs";
+import { createMap, mapCities } from "./atlas-map.mjs?v=5";
 import {portStatusPanel} from "./puertos.mjs";
 import { layerRecords, noticeForRegionDay } from "./avisos-mapa.mjs?v=3";
 const $ = (id) => document.getElementById(id);
@@ -76,7 +79,11 @@ function namesCity(item, city) {
 }
 let panel = null,
   mappedItems = [],
-  layer = "mar",
+  layer = "lluvias",
+  mode = "ahora",
+  hazard = "lluvias",
+  ubigeo = "",
+  catalog = null,
   feed = "oficial",
   region = "",
   selectedCity = "",
@@ -255,7 +262,7 @@ function onLayer(item) {
   const issuer = item.originNotice?.sourceId || item.sourceId;
   if (layer === "rios") return issuer === "senamhi-rios";
   return (
-    ["senamhi-lluvias", "senamhi-quebradas"].includes(issuer) ||
+    ["senamhi-lluvias", "senamhi-quebradas","senamhi-radar"].includes(issuer) ||
     (issuer === "senamhi-meteo" && topics(item).lluvias)
   );
 }
@@ -361,6 +368,9 @@ function explanationFor(item) {
   return { what, meaning: meaning.trim(), mode: "fuentes" };
 }
 function showRecord(item) {
+  const incident=impactOf(item);
+  const signal=incident && localExplorer.signals.find(s=>s.event?.id===incident.id);
+  if(signal) {localExplorer.signalDialog(signal);return;}
   const fields = [
     node("p", item.sourceName || item.source || item.sourceId, "record-source"),
   ];
@@ -398,6 +408,12 @@ function showRecord(item) {
           ".",
       ),
     );
+  if (item.changes?.length) {
+    const details=node("details","","record-timeline");
+    details.append(node("summary","Qué cambió en este aviso"));
+    for(const change of item.changes)details.append(node("p",dateTime(change.at)+" · "+change.text));
+    fields.push(details);
+  }
   if (item.withdrawnAt)
     fields.push(
       node(
@@ -414,8 +430,14 @@ function showRecord(item) {
         "El boletín contiene fechas de vigencia contradictorias. Consulta el documento original.",
       ),
     );
+  if (ubigeo && item.districtLevels?.[ubigeo]) {
+    const levels=item.districtLevels[ubigeo].map(s=>s.toLowerCase()).join(" y ");
+    fields.push(node("h3","Peligro en sectores del distrito"),node("p",catalog?.byId.get(ubigeo)?.name+" figura con nivel "+levels+". El nivel puede variar dentro del distrito. Consulta el mapa de la edición para localizar cada sector."));
+  }
   if (places(item).length)
     fields.push(node("p", "Ámbito mencionado: " + places(item).join(", ")));
+  if (item.radarType==="observacion") fields.push(node("p","Medición en el periodo del "+dateTime(item.observedFrom)+" al "+dateTime(item.observedAt)+" · hora de Perú."));
+  if (item.radarType) fields.push(node("p","Lugar citado por el parte · "+[item.locality,item.district,item.province,item.region].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i).join(", ")));
   const provinces = region && item.provincesByRegion?.[region];
   if (provinces?.length)
     fields.push(
@@ -545,6 +567,15 @@ function showRecord(item) {
     ...fields,
   );
 }
+function impactOf(item) {
+  return panel?.impacts?.events?.find(e=>e.itemId===item.id || (!e.itemId && e.url===item.url));
+}
+function locatedItem(item) {
+  if (!ubigeo) return true;
+  if (noticeCovers(item,ubigeo,catalog)) return true;
+  const event=impactOf(item);
+  return Boolean(event && catalog?.resolve(event.region,event.province,event.district)?.startsWith(ubigeo));
+}
 function renderItems() {
   const all = panel?.items || [];
   const subset = fromLayer && region
@@ -554,7 +585,7 @@ function renderItems() {
     (it) =>
       (feed === "todos" ||
         (feed === "oficial" ? it.kind === "oficial" : it.kind !== "oficial")) &&
-      (!region || inRegion(it, region)) &&
+      (!region || inRegion(it, region)) && locatedItem(it) &&
       (!localOnly || namesCity(it, selectedCity)) &&
       (!topic || fromLayer || topics(it)[topic]) &&
       (!period || validity(it) === period) &&
@@ -577,7 +608,7 @@ function renderItems() {
     ? "Consulta regional"
     : "Consulta nacional";
   $("feedHeading").textContent = region
-    ? "Avisos de " + (localOnly ? selectedCity : regionLabel(region))
+    ? "Avisos de " + (catalog?.byId.get(ubigeo)?.name || (localOnly ? selectedCity : regionLabel(region)))
     : "Avisos y reportes";
   $("listCount").textContent = panel
     ? list.length +
@@ -848,12 +879,18 @@ function syncLayer() {
       regionStatus.set(name, stats);
     }
   }
-  map?.showLayer(layer, counts, {
+  map?.select(region, selectedCity);
+  const result=localExplorer.render({panel,items:mappedItems,index:catalog,map,region,area:ubigeo,city:selectedCity,view:mode,layer,hazard});
+  const modeCounts=new Map();
+  for (const signal of result.viewSignals)
+    for (const r of signal.region?[signal.region]:(signal.regions || [])) modeCounts.set(r,(modeCounts.get(r)||0)+1);
+  $("hazardChoice").hidden=!(layer==="lluvias" && mode==="pronostico");
+  for(const b of document.querySelectorAll("[data-hazard]"))b.setAttribute("aria-pressed",String(b.dataset.hazard===hazard));
+  map?.showLayer(layer, modeCounts, {
     loaded: Boolean(panel),
     regionTotals,
-    regionStatus,
+    regionStatus:null,
   });
-  map?.select(region, selectedCity);
   document.querySelectorAll("[data-layer]").forEach((b) => {
     const enable = b.dataset.layer === layer;
     b.classList.toggle("selected", enable);
@@ -865,13 +902,8 @@ function syncLayer() {
       : layer === "rios"
         ? "Ríos · regiones con reportes"
         : "Lluvias · regiones con reportes";
-  $("coverageText").textContent = panel
-    ? (counts.size
-        ? counts.size +
-          (counts.size === 1 ? " zona con avisos" : " zonas con avisos")
-        : "Sin regiones identificadas") +
-      (layer === "mar" ? " de oleaje" : " en esta capa")
-    : "Consultando cobertura…";
+  if(layer!=="mar") $("legendTitle").textContent=mode==="ahora" ? (layer==="rios"?"Estaciones y reportes":"Lluvias e impactos") : "Sectores con pronóstico";
+  $("coverageText").textContent = panel ? modeCounts.size+" zonas con reportes" : "Consultando cobertura…";
   const layerSources =
     layer === "mar"
       ? ["marina", "coen"]
@@ -884,6 +916,11 @@ function syncLayer() {
   if (delayed.length) $("coverageText").textContent += " · lectura parcial";
   $("coverageText").disabled = !panel;
   $("coverageText").onclick = () => {
+    if(mode==="ahora") {
+      if(result.viewSignals.length) localExplorer.group(result.viewSignals, "Cobertura de "+layerNames[layer].toLowerCase());
+      else dialog("Cobertura","Sin reporte reciente",node("p","El último corte no incluye reportes localizados en esta capa."));
+      return;
+    }
     const water =
       layer === "rios" &&
       panel?.sources.find((source) => source.id === "senamhi-rios");
@@ -1048,6 +1085,20 @@ function syncLayer() {
       : "Criterios y fuentes de la capa  ⓘ";
 }
 $("mapDetails").onclick = () => {
+  if (mode==="pronostico" && layer==="lluvias") {
+    dialog("Pronóstico","Cómo leer las áreas de peligro",
+      node("p","El amarillo, el naranja y el rojo corresponden a los sectores que delimitó SENAMHI en sus archivos para esta edición. El color de fondo de una región indica cobertura de avisos."),
+      node("p","Cuando un aviso identifica un distrito con varios niveles, abre su ficha para verlos. La vigencia figura junto al documento."),
+      link("Avisos de lluvias de SENAMHI ↗","https://www.senamhi.gob.pe/?p=aviso-24H"),link("Avisos de quebradas ↗","https://www.senamhi.gob.pe/?p=aviso-activacion-quebrada"));return;
+  }
+  if (mode==="ahora" && layer!=="mar") {
+    dialog("Lectura del mapa",layer==="lluvias"?"Lluvia observada e impactos":"Estaciones y reportes de ríos",
+      node("p","El punto señala una ubicación publicada o agrupa reportes en la provincia o distrito identificado. La ficha indica la precisión de cada fuente."),
+      node("p","La gota identifica una medición. El triángulo rojo exige un impacto grave reciente respaldado por una autoridad o por fuentes independientes. Un umbral de estación describe la medición en ese punto."),
+      link("Radar y partes de SENAMHI ↗","https://www.senamhi.gob.pe/?p=reportes-nowcasting-radar"),
+      link("Reportes de emergencia del COEN ↗","https://portal.indeci.gob.pe/emergencias/"));
+    return;
+  }
   const national = mappedItems.filter(
     (i) => onLayer(i) && !regionNamesFor(i).length,
   );
@@ -1110,7 +1161,7 @@ function syncControls() {
   $("mapRegion").value = selectedCity ? "ciudad:" + selectedCity : region;
   $("topic").value = topic;
   $("period").value = period;
-  $("searchInput").value = query || selectedCity;
+  if(document.activeElement!==$("searchInput")) $("searchInput").value = query || selectedCity || (ubigeo && catalog?.label(ubigeo)) || "";
   for (const b of document.querySelectorAll("[data-feed]")) {
     const yes = b.dataset.feed === feed;
     b.classList.toggle("selected", yes);
@@ -1123,7 +1174,10 @@ function saveLocation() {
     region,
     ciudad: selectedCity,
     local: localOnly ? "1" : "",
-    capa: layer === "mar" ? "" : layer,
+    capa: layer,
+    vista: mode==="ahora" ? "" : mode,
+    peligro: mode==="pronostico" && layer==="lluvias" && hazard==="quebradas"?hazard:"",
+    ubigeo,
     tema: topic,
     tipo: feed === "oficial" ? "" : feed,
     vigencia: period,
@@ -1148,7 +1202,8 @@ function selectedMapTopic() {
     ? layer
     : "";
 }
-function setRegion(name, viaMap = false, city = "") {
+function setRegion(name, viaMap = false, city = "", id = "") {
+  ubigeo = id && catalog?.regionOf(id)===name ? id : "";
   selectedCity = findCity(city, name)?.name || "";
   localOnly = false;
   region = knownRegions.includes(name) ? name : "";
@@ -1160,18 +1215,15 @@ function setRegion(name, viaMap = false, city = "") {
     fromLayer = Boolean(topic);
   }
   changed();
-  if (viaMap && name && matchMedia("(max-width: 760px)").matches)
-    requestAnimationFrame(() => {
-      if ($("regionCard").getBoundingClientRect().top > innerHeight * 0.65)
-        $("regionCard").scrollIntoView({ block: "start" });
-    });
+
 }
 $("closeRegion").onclick = () => setRegion("", true);
 $("regionSelect").onchange = (e) => setRegion(e.target.value);
 $("mapRegion").onchange = (e) => {
   const value = e.target.value;
   const city = value.startsWith("ciudad:") && findCity(value.slice(7));
-  setRegion(city ? city.region : value, true, city ? city.name : "");
+  if(city)setRegion(city.region,true,city.name);
+  else navigateArea(value,"");
 };
 $("topic").onchange = (e) => {
   topic = e.target.value;
@@ -1212,7 +1264,9 @@ $("clearFilters").onclick = () => {
   topic = "";
   period = "";
   fromLayer = false;
-  layer = "mar";
+  layer = "lluvias";
+  mode="ahora";
+  ubigeo="";
   changed();
 };
 $("more").onclick = () => {
@@ -1228,6 +1282,25 @@ $("queryState").querySelector("button").onclick = () => {
 $("searchForm").onsubmit = (e) => {
   e.preventDefault();
   const q = $("searchInput").value.trim().slice(0, 100);
+  const code=catalog?.byId.has(q)?q:placeOptions.get(normalizePlace(q));
+  if(code) {
+    const loc=catalog.byId.get(code);
+    setRegion(catalog.regionOf(code),true,"",loc.id.length>2?loc.id:"");
+    $("placeTitle").focus({preventScroll:true});
+    return;
+  }
+  const exact=catalog?.names.get(normalizePlace(q)) || [];
+  if(exact.length && !findRegion(q) && !findCity(q)){
+    if(exact.length===1){const p=exact[0];setRegion(catalog.regionOf(p.id),true,"",p.id.length>2?p.id:"");}
+    else {
+      const choices=exact.map(p=>{
+        const b=node("button",catalog.label(p.id)+" · "+p.id,"place-choice");
+        b.onclick=()=>{$("infoDialog").close();setRegion(catalog.regionOf(p.id),true,"",p.id.length>2?p.id:"");};return b;
+      });
+      dialog("Elegir ubicación","Lugares llamados "+q,...choices);
+    }
+    return;
+  }
   const match = findRegion(q);
   const city = !match && findCity(q);
   query = match || city ? "" : q;
@@ -1240,8 +1313,7 @@ $("searchForm").onsubmit = (e) => {
     const locationForMap = new URL(location.href);
     locationForMap.hash = "inicio";
     window.history.replaceState(null, "", locationForMap);
-    $("regionCard").scrollIntoView({ block: "nearest" });
-    $("regionCard").focus({ preventScroll: true });
+    $("placeTitle").focus({ preventScroll: true });
     return;
   }
   if (location.hash !== "#avisos") location.hash = "avisos";
@@ -1278,7 +1350,14 @@ function restoreLocation() {
   selectedCity = city?.name || "";
   if (city) region = city.region;
   localOnly = Boolean(city && q.get("local") === "1");
-  layer = ["rios", "lluvias"].includes(q.get("capa")) ? q.get("capa") : "mar";
+  ubigeo = /^\d{4}(?:\d{2})?$/.test(q.get("ubigeo") || "") ? q.get("ubigeo") : "";
+  if(catalog && ubigeo) {
+    if(catalog.byId.has(ubigeo)) region=catalog.regionOf(ubigeo);
+    else ubigeo="";
+  }
+  hazard=q.get("peligro")==="quebradas"?"quebradas":"lluvias";
+  mode=q.get("vista")==="pronostico"?"pronostico":"ahora";
+  layer = ["rios","mar","lluvias"].includes(q.get("capa")) ? q.get("capa") : q.has("region") && !q.has("ubigeo") && !q.has("vista") ? "mar" : "lluvias";
   feed = ["todos", "prensa"].includes(q.get("tipo"))
     ? q.get("tipo")
     : "oficial";
@@ -1295,6 +1374,45 @@ function restoreLocation() {
   syncLayer();
   renderItems();
 }
+const localExplorer=explorer({node,link,dialog,dateTime,showRecord,onPlace:(r,id)=>navigateArea(r,id)});
+function navigateArea(r,id) {
+  const returnFocus=$("placeTrail").contains(document.activeElement) || document.activeElement===$("areaSelect");
+  const old=location.href;
+  setRegion(r,true,"",id);
+  const updated=location.href;
+  if(returnFocus)$("placeTitle").focus({preventScroll:true});
+  if(old!==updated){history.replaceState(null,"",old);history.pushState(null,"",updated);}
+}
+for(const b of document.querySelectorAll("[data-hazard]")) b.onclick=()=>{hazard=b.dataset.hazard;changed();};
+for(const b of document.querySelectorAll("[data-view]")) b.onclick=()=>{
+  mode=b.dataset.view;
+  changed();
+};
+const placeOptions=new Map();
+void loadTerritories().then(index=>{
+  catalog=index;
+  for(const p of index.places.filter(p=>p.id.length>2)) {
+    const description=index.label(p.id)+" ("+(p.id.length===6?"distrito":"provincia")+")";
+    placeOptions.set(normalizePlace(description),p.id);
+  }
+  updateSuggestions();
+  restoreLocation();
+}).catch(()=>{});
+function updateSuggestions() {
+  const q=normalizePlace($("searchInput").value);
+  if(!catalog || q.length<2) return;
+  const found=[];
+  for(const [name,id] of placeOptions)
+    if(name.includes(q) || id.startsWith(q)) found.push({id,name,rank:name.startsWith(q)?0:1});
+  found.sort((a,b)=>a.rank-b.rank || a.name.localeCompare(b.name,"es"));
+  const options=found.slice(0,24).map(({id})=>{
+    const value=catalog.label(id)+" ("+(id.length===6?"distrito":"provincia")+")";
+    return new Option(value,value);
+  });
+  for(const region of knownRegions)if(normalizePlace(region).startsWith(q))options.unshift(new Option(regionTitle(region),regionTitle(region)));
+  $("places").replaceChildren(...options);
+}
+$("searchInput").addEventListener("input",updateSuggestions);
 window.addEventListener("popstate", restoreLocation);
 restoreLocation();
 const fallbackSources = [
@@ -1314,7 +1432,7 @@ function renderSources() {
   const state = $("publicationStatus");
   if (state) state.hidden = !provenance || !Object.prototype.hasOwnProperty.call(triggers, provenance.event);
   if (state && !state.hidden) {
-    const history = "https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/atlas.yml?query=event%3Aschedule";
+    const history = "https://github.com/Jccv26/atlas-el-nino-peru/actions/workflows/horario.yml?query=event%3Aschedule";
     state.replaceChildren(document.createTextNode("Esta edición se inició por " + triggers[provenance.event] +
       ". " + (provenance.lastScheduled?.at
         ? "Última consulta iniciada por horario el " + dateTime(provenance.lastScheduled.at) + ". "
@@ -1367,6 +1485,7 @@ function renderSources() {
   );
 }
 let weekly = null;
+$("compareHistory").onclick=()=>mostrarHistoria({weekly,node,link,dialog});
 const weeklySource = "https://www.cpc.ncep.noaa.gov/data/indices/wksst9120.for";
 const degree = (number) =>
   (number > 0 ? "+" : "") +
@@ -1664,7 +1783,9 @@ function showEditionTime(failed = false) {
 }
 renderSources();
 createMap({
-  onRegion: (name, city) => setRegion(name, true, city),
+  onRegion: (name, city) => city ? setRegion(name,true,city) : navigateArea(name,""),
+  onArea: id => {const r=catalog?.regionOf(id);if(r)navigateArea(r,id);},
+  onGroup: (list,title,r) => r?navigateArea(r,""):localExplorer.group(list,title),
   onOceanReady: (t, s, product) => {
     oceanProduct = product;
     oceanTime = t;

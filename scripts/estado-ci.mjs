@@ -1,3 +1,4 @@
+import {actualizarSectores} from '../lib/sectores-senamhi.mjs';
 // Publisher for a GitHub-hosted, serialized workflow. The data-only branch is
 // never executed. Only a verified allowlist of regular files is restored.
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
@@ -10,14 +11,16 @@ import { fetchOcean } from '../public/atlas/oceano.mjs';
 import { fetchTemperature, isTemperatureSnapshot } from '../lib/temperatura.mjs';
 import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
 import { generateExplanations, explanationBatchMaxUsd } from '../lib/explicaciones.mjs';
-import { refreshPanorama } from '../lib/panorama.mjs';
+import { refreshPanorama, reuseDetail } from '../lib/panorama.mjs';
+import {materialize} from '../lib/radar-ahora.mjs';
+import {radarDescriptor,radarReadingItems} from '../lib/edicion-local.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
 const dayMs = 86400000;
 const ledgerName = '.atlas-reservas.v1';
 const metaName = 'edicion.json';
 const temperatureFile = 'public/data/temperatura.json';
-const baseFiles = ['public/data/panorama.json', 'public/atlas/oceano.json', temperatureFile];
+const baseFiles = ['public/data/panorama.json', 'public/atlas/oceano.json', temperatureFile, 'public/data/sectores-lluvias.json', 'public/data/sectores-quebradas.json'];
 const audioName = /^boletin-(\d{4}-\d{2}-\d{2})-(07|13|19)\.(?:wav|mp3)$/;
 const relativeState =
   /^boletines\/(\d{4}-\d{2}-\d{2})-(07|13|19)\/(?:(?:text|fuentes)\.json|(?:texto|voz)-[12]\.reserved)$/;
@@ -28,11 +31,15 @@ const batchSignature = /^[a-f0-9]{64}$/;
 // The bulletin can reserve up to two text and two voice attempts in each
 // of 93 monthly editions, at 12 cents an attempt. Both features share the
 // original ceiling. The regional publisher books a whole cent even on timeout.
-export function regionalBudgetCents(value = process.env.OPENAI_BULLETIN_BUDGET_USD ?? 60) {
-  const total = Math.floor(Math.min(60, Number(value)) * 100);
-  if (!Number.isFinite(total) || total <= 0) return 0;
-  const bulletin = Math.min(2, Math.floor(total / 2232)) * 2232;
-  return Math.min(600, total - bulletin);
+function budgetCents(value) {
+  const dollars=Number(value);
+  return Number.isFinite(dollars) && dollars>0 ? Math.floor(Math.min(60,dollars)*100+1e-8):0;
+}
+export function bulletinGrantsPerSlot(value=process.env.OPENAI_BULLETIN_BUDGET_USD ?? 60) {
+  return Math.min(2,Math.floor(budgetCents(value)/2232));
+}
+export function regionalBudgetCents(value=process.env.OPENAI_BULLETIN_BUDGET_USD ?? 60) {
+  return Math.min(600,budgetCents(value)-bulletinGrantsPerSlot(value)*2232);
 }
 
 function allowedPath(p) {
@@ -171,6 +178,21 @@ function slotAt(now) {
     h = lima.getUTCHours();
   return h < 7 ? null : lima.toISOString().slice(0, 10) + '-' + (h < 13 ? '07' : h < 19 ? '13' : '19');
 }
+export function publicationFor(previous, updatedAt, env=process.env) {
+  const runId=env.GITHUB_RUN_ID, event=Number(env.GITHUB_RUN_ATTEMPT)>1?'rerun':env.GITHUB_EVENT_NAME;
+  if (env.GITHUB_ACTIONS!=='true' || !['push','workflow_dispatch','schedule','rerun'].includes(event) || !/^\d+$/.test(runId)) return null;
+  const current=Date.parse(updatedAt);
+  const valid=run=>/^\d+$/.test(run?.runId) && Number.isFinite(Date.parse(run?.at)) && Date.parse(run.at)<=current;
+  const publication={event,runId};
+  const fresh=event==='schedule' && env.GITHUB_RUN_ATTEMPT==='1';
+  const scheduled=fresh?{at:updatedAt,runId}:previous?.lastScheduled;
+  if (!valid(scheduled)) return publication;
+  publication.lastScheduled=scheduled;
+  const candidate=fresh && previous?.lastScheduled?.runId!==runId?previous?.lastScheduled:previous?.priorScheduled;
+  const gap=Date.parse(scheduled.at)-Date.parse(candidate?.at);
+  if (valid(candidate) && candidate.runId!==scheduled.runId && gap>0 && gap<=35*60000) publication.priorScheduled=candidate;
+  return publication;
+}
 function validateBranchTree(dir) {
   for (const row of git(dir, ['ls-tree', '-r', 'FETCH_HEAD']).split('\n')) {
     const [attrs, p] = row.split('\t');
@@ -204,6 +226,77 @@ async function seedCurrentSlot(stateDir, panorama) {
   const { audioUrl, voiceType, ...record } = b;
   const filename = record.mode === 'fuentes' ? 'fuentes.json' : 'text.json';
   await writeFile(join(dir, filename), JSON.stringify(record), { mode: 0o600 });
+}
+const timestamp = date => Date.parse(date) || 0;
+
+function mergedRadar(seed,published,now) {
+  const readings=[seed,published].filter(r=>r?.schemaVersion===1 && Array.isArray(r.reports) &&
+    timestamp(r.checkedAt)>0 && timestamp(r.checkedAt)<=now).sort((a,b)=>timestamp(a.checkedAt)-timestamp(b.checkedAt));
+  if (!readings.length) return null;
+  const reports=new Map(), desks={};
+  for (const reading of readings) {
+    for (const desk of reading.coverage || []) {
+      const old=desks[desk.code];
+      if (!old || timestamp(desk.latestIssuedAt)>timestamp(old.latestIssuedAt) ||
+          (desk.latestIssuedAt===old.latestIssuedAt && desk.latestReportId>=old.latestReportId)) desks[desk.code]=desk;
+    }
+    for (const report of reading.reports) {
+      const slot=report.radar+'/'+report.issuedAt;
+      if (!reports.has(slot) || reports.get(slot).id<=report.id) reports.set(slot,report);
+    }
+  }
+  const current=[...reports.values()].filter(report=>{
+    const desk=desks[report.radar];
+    return !(desk?.latestIssuedAt===report.issuedAt && desk.latestReportId>report.id);
+  });
+  const newest=readings.at(-1);
+  const lastSuccessAt=readings.map(r=>r.lastSuccessAt).filter(d=>timestamp(d)>0 && timestamp(d)<=now).sort().at(-1) || null;
+  return materialize(current,new Date(now),{status:newest.status,checkedAt:newest.checkedAt,lastSuccessAt,desks});
+}
+
+function mergedImpacts(seed,published,now) {
+  const readings=[seed,published].filter(r=>r?.schemaVersion===1 && Array.isArray(r.events) &&
+    timestamp(r.checkedAt)>0 && timestamp(r.checkedAt)<=now).sort((a,b)=>timestamp(a.checkedAt)-timestamp(b.checkedAt));
+  if (!readings.length) return null;
+  const events=new Map();
+  for (const reading of readings) for (const event of reading.events) {
+    const reported=timestamp(event.reportedAt), old=events.get(event.id);
+    if (!event.id || !reported || reported>now || now-reported>7*dayMs) continue;
+    if (old && old.revision===event.revision) {
+      // A re-read of the headline cannot revoke evidence from the same PDF.
+      // A changed report revision or a changed attachment remains authoritative.
+      const oldPdf=old.evidence?.find(e=>e.label==='Reporte oficial en PDF')?.url;
+      const newPdf=event.evidence?.find(e=>e.label==='Reporte oficial en PDF')?.url;
+      const sameAttachment=!newPdf || newPdf===oldPdf;
+      if (old.pdfVerified && !event.pdfVerified && sameAttachment || old.reviewedCase && !event.reviewedCase && old.pressSignature===event.pressSignature ||
+          timestamp(old.checkedAt)>timestamp(event.checkedAt) && sameAttachment) continue;
+    }
+    events.set(event.id,event);
+  }
+  return {schemaVersion:1,checkedAt:readings.at(-1).checkedAt,events:[...events.values()].map(e=>
+    e.severe && now-timestamp(e.reportedAt)>6*3600000 ? {...e,severe:false}:e)};
+}
+
+function combineDetail(record,other) {
+  if (!other || !record.sourceId?.startsWith('senamhi-') || record.sourceId===radarDescriptor.id ||
+      record.withdrawnAt || record.supersededBy || record.invalidValidity ||
+      other.withdrawnAt || other.supersededBy || other.invalidValidity ||
+      (record.shapeArchiveUrl && other.shapeArchiveUrl && record.shapeArchiveUrl!==other.shapeArchiveUrl) ||
+      ['validFrom','validUntil'].some(k=>record[k]?.includes('T') && other[k]?.includes('T') && timestamp(record[k])!==timestamp(other[k]))) return record;
+  const full={...record};
+  reuseDetail(full,other);
+  const same=full.noticeNumber && full.noticeNumber===other.noticeNumber && full.level===other.level &&
+    full.title===other.title && full.validFrom===other.validFrom && full.validUntil===other.validUntil;
+  if (same && ['senamhi-lluvias','senamhi-quebradas'].includes(full.sourceId)) {
+    if (!Object.keys(full.districtLevels || {}).length && Object.keys(other.districtLevels || {}).length &&
+        full.regionOrigin?.startsWith('mapa-senamhi') &&
+        other.coverageUrls?.some(url=>full.coverageUrls?.includes(url))) {
+      full.districtLevels=other.districtLevels;
+      full.districtUnmatchedCounts=other.districtUnmatchedCounts;
+    }
+    if (!full.shapeArchiveUrl && other.shapeArchiveUrl) full.shapeArchiveUrl=other.shapeArchiveUrl;
+  }
+  return full;
 }
 // Choose observations by their successful read, and independently retain the
 // newest actual attempt (which may have failed after that read on another host).
@@ -240,24 +333,62 @@ export function mergePanorama(seed, published, now = Date.now()) {
       schemaVersion = Math.min(schemaVersion,seed.schemaVersion);
     }
   }
-  return {...published,schemaVersion,updatedAt:new Date(checkedThrough).toISOString(),sources:[...sources.values()],
-    items:[...published.items.filter(i=>!replacements.has(i.sourceId)),...[...replacements.values()].flat()]};
+  const seedItems=new Map(seed.items.map(i=>[i.id,i])), publishedItems=new Map(published.items.map(i=>[i.id,i]));
+  const records=[...published.items.filter(i=>!replacements.has(i.sourceId)),...[...replacements.values()].flat()];
+  let items=records.map(i=>combineDetail(i,(replacements.has(i.sourceId)?publishedItems:seedItems).get(i.id)));
+  const radar=mergedRadar(seed.radar,published.radar,now), impacts=mergedImpacts(seed.impacts,published.impacts,now);
+  if (radar) {
+    const entries=radarReadingItems(radar);
+    items=items.filter(i=>i.sourceId!==radarDescriptor.id).concat(entries);
+    sources.set(radarDescriptor.id,{...radarDescriptor,status:radar.status==='ok'?'ok':radar.lastSuccessAt?'stale':'error',
+      checkedAt:radar.checkedAt,lastSuccessAt:radar.lastSuccessAt,count:entries.length});
+    checkedThrough=Math.max(checkedThrough,timestamp(radar.checkedAt));
+  }
+  return {...published,...(radar&&{radar}),...(impacts&&{impacts}),schemaVersion,updatedAt:new Date(checkedThrough).toISOString(),sources:[...sources.values()],items};
 }
 
-async function mirrorPublic(root, cache, now, restore, seed = null) {
+export async function mirrorPublic(root, cache, now, restore, seed = null) {
   // A first runner may have reserved an edition and stopped before validating
   // the first snapshot. In that case use the public assets checked into main.
   if (restore && !(await optionalFile(join(cache, baseFiles[0])))) return;
   const source = restore ? cache : root,
     target = restore ? root : cache;
+  let panorama=seed;
   for (const relative of baseFiles) {
     const data = await optionalFile(join(source, relative));
     if (!data) continue;
     if (restore && seed && relative === baseFiles[0]) {
-      await writeFile(join(target,relative),JSON.stringify(mergePanorama(seed,JSON.parse(data),now)));
+      panorama=mergePanorama(seed,JSON.parse(data),now);
+      await writeFile(join(target,relative),JSON.stringify(panorama));
       continue;
     }
     if (relative === temperatureFile && !savedTemperature(data)) continue;
+    if (restore && (relative.includes("sectores-") || relative===temperatureFile || relative===baseFiles[1])) {
+      const local=await optionalFile(join(target,relative));
+      if(local) {
+        let staged,cached;
+        try {staged=JSON.parse(local);} catch { /* Restore the published copy. */ }
+        try {cached=JSON.parse(data);} catch {if(staged)continue;}
+        if (staged && cached) {
+          if (relative===temperatureFile && savedTemperature(local)) {
+            if (staged.comparison && !cached.comparison || staged.seriesEnd>cached.seriesEnd ||
+                staged.seriesEnd===cached.seriesEnd && timestamp(staged.checkedAt)>timestamp(cached.checkedAt)) continue;
+          } else if (relative===baseFiles[1]) {
+            if (timestamp(staged.time)>timestamp(cached.time)) continue;
+          } else if (relative.includes('sectores-')) {
+            const sourceId=relative.endsWith('sectores-lluvias.json')?'senamhi-lluvias':'senamhi-quebradas';
+            const record=panorama?.items.filter(i=>i.sourceId===sourceId && !i.withdrawnAt && !i.supersededBy &&
+              !i.invalidValidity && timestamp(i.validFrom)<=now && now<timestamp(i.validUntil))
+              .sort((a,b)=>timestamp(b.validFrom)-timestamp(a.validFrom))[0];
+            const matches=s=>record && s.sourceId===sourceId && s.noticeNumber===record.noticeNumber &&
+              s.validFrom===record.validFrom && s.validUntil===record.validUntil && s.date===limaDay(timestamp(record.validFrom)) &&
+              (!record.shapeArchiveUrl || s.sourceUrl===record.shapeArchiveUrl) && Array.isArray(s.features) && s.features.length>0;
+            if (matches(staged) && !matches(cached) || Boolean(matches(staged))===Boolean(matches(cached)) &&
+                timestamp(staged.checkedAt)>timestamp(cached.checkedAt)) continue;
+          }
+        }
+      }
+    }
     await copy(join(source, relative), join(target, relative));
   }
   const folder = 'public/media';
@@ -367,21 +498,15 @@ export async function publishCycle({
     const retryInput = {...previous,sources:previous.sources?.map(s =>
       ['stale','error'].includes(s.status) ? {...s,checkedAt:null} : s)};
     const snapshot = await (refresh ?? refreshPanorama)(retryInput,{now:new Date(now)});
-    const event = Number(process.env.GITHUB_RUN_ATTEMPT)>1 ? 'rerun' : process.env.GITHUB_EVENT_NAME;
-    if (process.env.GITHUB_ACTIONS === 'true' && ['push','workflow_dispatch','schedule','rerun'].includes(event) &&
-        /^\d+$/.test(process.env.GITHUB_RUN_ID ?? '')) {
-      snapshot.publication = {event, runId:process.env.GITHUB_RUN_ID};
-      const scheduled = event === 'schedule' && process.env.GITHUB_RUN_ATTEMPT === '1'
-        ? {at:snapshot.updatedAt, runId:process.env.GITHUB_RUN_ID}
-        : previous.publication?.lastScheduled;
-      if (scheduled) snapshot.publication.lastScheduled = scheduled;
-    }
+    await actualizarSectores(snapshot.items,join(root,"public/data"),new Date(now));
+    const publication=publicationFor(previous.publication,snapshot.updatedAt);
+    if (publication) snapshot.publication=publication;
     const temperaturePath = join(root, temperatureFile);
     try {
       const stored = await optionalFile(temperaturePath);
       const previous = savedTemperature(stored);
       const lastCheck = Date.parse(previous?.checkedAt);
-      if (!Number.isFinite(lastCheck) || lastCheck > now || limaDay(lastCheck) !== limaDay(now)) {
+      if (!previous?.comparison || !Number.isFinite(lastCheck) || lastCheck > now || limaDay(lastCheck) !== limaDay(now)) {
         const report = await temperature({ now });
         if (!isTemperatureSnapshot(report) || (previous?.seriesEnd && previous.seriesEnd > report.seriesEnd))
           throw new Error('Retroceso en la última semana de NOAA');
@@ -419,7 +544,7 @@ export async function publishCycle({
       apiEnabled &&
       !hasAudio &&
       hasSources &&
-      grants.length < 2 &&
+      grants.length < bulletinGrantsPerSlot() &&
       (!grants.length || now - grants.at(-1) > 20 * 60000);
     if (canGenerate) {
       await writeFile(join(root, baseFiles[0]), JSON.stringify(snapshot));

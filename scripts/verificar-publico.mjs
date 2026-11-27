@@ -3,6 +3,7 @@ import {lstat, open, readdir} from 'node:fs/promises';
 import {isIP} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {radarDescriptor} from '../lib/edicion-local.mjs';
 import {officialSources} from '../lib/oficiales.mjs';
 import {isPhisisRiverEvidence} from '../lib/rios-phisis.mjs';
 import {mediaSources} from '../lib/medios.mjs';
@@ -10,8 +11,8 @@ import {pii} from '../lib/privacidad.mjs';
 import {isTemperatureSnapshot} from '../lib/temperatura.mjs';
 import {layerRecords} from '../public/avisos-mapa.mjs';
 
-const registry = new Map([...officialSources, ...mediaSources].map(s => [s.id, s]));
-const issuerIds = new Set(officialSources.map(s => s.id));
+const registry = new Map([...officialSources, radarDescriptor, ...mediaSources].map(s => [s.id, s]));
+const issuerIds = new Set([...officialSources,radarDescriptor].map(s => s.id));
 const extensions = new Set(['.html','.css','.js','.mjs','.json','.txt','.xml','.svg','.jpg','.jpeg','.png','.webp','.avif','.ico','.gif','.woff','.woff2','.wav','.mp3','.webmanifest','.webm','.mp4']);
 const blockedName = /(?:^|[._-])(?:env|credentials?|secrets?|private[-_]?key|id_rsa|id_ed25519|node_modules|estado)(?:[._-]|$)/i;
 const sensitiveText = [
@@ -151,13 +152,54 @@ function checkExplanations(p, issues) {
   }
 }
 
+const officialRadarDocument=(url,id)=>publicUrl(url,"www.senamhi.gob.pe") && Number.isSafeInteger(id) &&
+  url==="https://www.senamhi.gob.pe/prod/sismet/v1/api/v1/public/resources/"+id+"/file";
+function checkRadar(r,issues) {
+  if (!r) return;
+  if (r.schemaVersion!==1 || !Array.isArray(r.reports) || !Array.isArray(r.observations) || !Array.isArray(r.forecasts) || !publicUrl(r.sourceUrl,"www.senamhi.gob.pe")) {issues.push("Radar · índice inválido");return;}
+  const docs=new Map(r.reports.map(d=>[d.id,d]));
+  for(const d of r.reports) {
+    if(!officialRadarDocument(d.url,d.id) || !isTimestamp(d.issuedAt) || !isTimestamp(d.validUntil))issues.push("Radar · PDF u hora de emisión sin identificar");
+    checkPrivacy(d,["forecastText","observationText","radarName"],"radar",issues);
+  }
+  for(const row of [...r.observations,...r.forecasts,...r.reports.flatMap(d=>[...(d.observations || []),...(d.forecasts || [])])]) {
+    const doc=docs.get(row.reportId);
+    if(!doc || row.url!==doc.url || row.issuedAt!==doc.issuedAt || !isTimestamp(row.from) || !isTimestamp(row.until) ||
+        !isTimestamp(row.expiresAt) || Date.parse(row.from)>=Date.parse(row.until) || !isText(row.text) ||
+        (row.coordinates && (!Array.isArray(row.coordinates) || row.coordinates.length!==2 || !row.coordinates.every(Number.isFinite) || !publicUrl(row.coordinateSource,"www.senamhi.gob.pe"))))
+      issues.push("Radar · lectura sin parte de respaldo o intervalo válido");
+    checkPrivacy(row,["station","district","region","province","text"],"lectura",issues);
+  }
+}
+function checkImpacts(data,issues) {
+  if(!data)return;
+  if(data.schemaVersion!==1 || !Array.isArray(data.events)){issues.push("Impactos · colección inválida");return;}
+  const hosts=new Set([...registry.values()].map(r=>hostKey(new URL(r.url).hostname)).concat(["gob.pe"]));
+  const isSource=url=>publicUrl(url) && hosts.has(hostKey(new URL(url).hostname));
+  const ids=new Set();
+  for (const e of data.events) {
+    const source=registry.get(e.sourceId);
+    if(!source || !publicUrl(e.url,new URL(source.url).hostname) || !isText(e.title) || !isTimestamp(e.reportedAt) || ids.has(e.id) ||
+        (e.kind==="oficial")!==issuerIds.has(e.sourceId) || !Array.isArray(e.timeline) || !Array.isArray(e.evidence) ||
+        (e.severe && (!e.severityEvidence || e.resolved || e.kind!=="oficial" && !e.corroborated)))issues.push("Impactos · registro sin respaldo territorial o documental");
+    ids.add(e.id);
+    if(e.corroborated && new Set((e.contributors || []).filter(x=>isSource(x.url)).map(x=>hostKey(new URL(x.url).hostname))).size<2)issues.push("Impactos · corroboración sin dos emisores identificados");
+    for(const ref of [...(e.timeline || []),...(e.evidence || []),...(e.contributors || []),...(e.recommendations || []),...(e.severityEvidence?[e.severityEvidence]:[])]) {
+      if(!isSource(ref.url))issues.push("Impactos · enlace a una fuente no registrada");
+      checkPrivacy(ref,["text","label","caption"],"referencia local",issues);
+    }
+    checkPrivacy(e,["title","summary","district","locality","corroboratedClaim"],"impacto",issues);
+  }
+}
 function checkSnapshot(p, files, issues, notes) {
   if (!p || typeof p!=='object' || ![1,2].includes(p.schemaVersion) || !isTimestamp(p.updatedAt) || !Array.isArray(p.sources) || !p.sources.length || !Array.isArray(p.items)) {
     issues.push('panorama · estructura, fuentes o fecha de actualización inválidas'); return;
   }
   const asOf = Date.parse(p.updatedAt);
   if (p.publication) {
-    const {event,runId,lastScheduled} = p.publication;
+    const {event,runId,lastScheduled,priorScheduled} = p.publication;
+    if(priorScheduled && (!lastScheduled || !/^\d+$/.test(priorScheduled.runId) || lastScheduled.runId===priorScheduled.runId ||
+      !isTimestamp(priorScheduled.at) || Date.parse(priorScheduled.at)>=Date.parse(lastScheduled.at)))issues.push('panorama · secuencia de ejecución por horario inválida');
     if (!['push','workflow_dispatch','schedule','rerun'].includes(event) || !/^\d+$/.test(runId) ||
         (lastScheduled && (!/^\d+$/.test(lastScheduled.runId) || !isTimestamp(lastScheduled.at) || Date.parse(lastScheduled.at)>asOf)))
       issues.push('panorama · historial de actualización incoherente');
@@ -226,6 +268,8 @@ function checkSnapshot(p, files, issues, notes) {
   if(!declared.has('coen') || !declared.has('enfen')) issues.push('panorama · faltan las fuentes de referencia COEN/ENFEN');
   if(declared.get('enfen')?.status==='ok' && !p.items.some(i=>i?.sourceId==='enfen' && /comunicado oficial/i.test(i.title) && isTimestamp(i.publishedAt))) issues.push('ENFEN · lectura marcada exitosa sin comunicado oficial fechado');
   if(!p.items.some(it=>it && issuerIds.has(it.sourceId)&&isTimestamp(declared.get(it.sourceId)?.lastSuccessAt))) issues.push('panorama · ningún registro oficial con una fuente verificada');
+  checkRadar(p.radar,issues);
+  checkImpacts(p.impacts,issues);
   checkExplanations(p,issues);
   const b=p.bulletin;
   if(!b)return;
@@ -288,6 +332,10 @@ export async function verificarPublico(directory) {
       if(sensitiveText.some(rx=>rx.test(raw))) issues.push(display+' · posible credencial o clave privada (valor omitido)');
       if(relative==='data/panorama.json'){
         try{panorama=JSON.parse(data.toString('utf8'));}catch{issues.push('panorama · JSON inválido');}
+      }
+      if(relative==='data/impactos-semilla.json' || relative==='data/radar-semilla.json'){
+        try{const value=JSON.parse(data.toString('utf8'));privateKeys(value,relative,issues);(relative.includes("radar")?checkRadar:checkImpacts)(value,issues);}
+        catch{issues.push(relative+' · semilla local ilegible');}
       }
       if(relative==='data/temperatura.json'){
         try{if(!isTemperatureSnapshot(JSON.parse(data.toString('utf8')))) issues.push('temperatura · serie semanal inválida');}

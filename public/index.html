@@ -24,6 +24,7 @@
     />
     <link rel="stylesheet" href="./atlas.css?v=4" />
     <link rel="stylesheet" href="./mapa-interaccion.css?v=6" />
+    <link rel="stylesheet" href="./situacion.css?v=1" />
   </head>
   <body>
     <aside id="fileEntry" class="file-entry" hidden>
@@ -36,7 +37,7 @@
         const link = document.getElementById("editionLink");
         const edition = new URL(link.href);
         const local = new URL(location.href);
-        for (const name of ["region", "ciudad", "local", "capa", "tema", "tipo", "vigencia", "q", "mapa"]) {
+        for (const name of ["region", "ciudad", "local", "capa", "tema", "tipo", "vigencia", "q", "mapa", "ubigeo", "vista", "peligro"]) {
           if (local.searchParams.has(name)) edition.searchParams.set(name, local.searchParams.get(name));
         }
         if (["#inicio", "#temperatura", "#avisos", "#fuentes"].includes(local.hash)) edition.hash = local.hash;
@@ -69,8 +70,8 @@
         ><input
           type="search"
           id="searchInput"
-          placeholder="Buscar región, río o lugar"
-          aria-label="Buscar región, río o lugar"
+          placeholder="Buscar región, provincia o distrito"
+          aria-label="Buscar región, provincia o distrito"
           maxlength="100"
           list="places"
         /><datalist id="places"></datalist
@@ -79,6 +80,14 @@
     </header>
     <main>
       <section id="inicio" aria-label="Mapa interactivo del Perú">
+        <div class="situation-header">
+          <div><h1>Situación en el Perú</h1><p id="editionLine" role="status">Consultando la última edición…</p></div>
+          <div class="view-switch" role="group" aria-label="Momento del mapa">
+            <button data-view="ahora" aria-pressed="true">Último corte</button>
+            <button data-view="pronostico" aria-pressed="false">Pronóstico</button>
+          </div>
+        </div>
+        <div class="explorer">
         <div class="map-frame" id="mapFrame">
           <svg
             id="map"
@@ -155,29 +164,7 @@
               ><button data-layer="rios" aria-pressed="false">Ríos</button>
             </div>
           </div>
-          <div class="climate-card" id="climateCard">
-            <div class="card-top">
-              <span class="eyebrow">Pronóstico de ENFEN</span
-              ><span class="card-icon" aria-hidden="true">≈</span>
-            </div>
-            <h1>El Niño costero</h1>
-            <p class="mag-label" id="magLabel">
-              Magnitud del calentamiento del mar
-            </p>
-            <strong id="magnitude" class="magnitude">Extraordinaria</strong>
-            <p id="outlook">
-              Se mantendría hasta febrero de 2027, según el comunicado del 13 de
-              noviembre.
-            </p>
-            <a
-              id="climateLink"
-              target="_blank"
-              rel="noopener"
-              href="https://repositorio.imarpe.gob.pe/items/d3746777-ec3a-466e-8d2c-3e4b9a4146e8"
-              ><span id="climateSource">ENFEN · 13 nov 2026</span
-              ><span aria-hidden="true">↗</span></a
-            >
-          </div>
+          <div class="hazard-choice" id="hazardChoice" role="group" aria-label="Área de peligro a dibujar" hidden><button data-hazard="lluvias" aria-pressed="true">Lluvia en 24 h</button><button data-hazard="quebradas" aria-pressed="false">Quebradas</button></div>
           <div class="map-legend" id="mapLegend" aria-live="polite">
             <div id="legendTitle">Anomalía térmica del mar · °C</div>
             <div class="scale-bar" id="scaleBar"></div>
@@ -207,6 +194,17 @@
           <div id="mapHint" class="map-hint">
             Selecciona una región para ver sus avisos
           </div>
+
+        </div>
+          <aside class="local-pane" aria-labelledby="placeTitle">
+            <nav id="placeTrail" class="place-trail" aria-label="Ruta territorial"></nav>
+            <h2 id="placeTitle" tabindex="-1">Todo el Perú</h2>
+            <label id="areaSelectLabel" class="area-select" hidden><span id="areaSelectTitle"></span><select id="areaSelect"></select></label>
+            <div class="pane-heading"><h3 id="signalsTitle">Reportes del último corte</h3><span id="signalsCount"></span></div>
+            <div id="localSignals" class="local-signals" aria-live="polite"></div>
+            <button type="button" id="allSignals" class="pane-more" hidden>Ver todos los reportes →</button>
+            <details id="pastSignals" hidden><summary>Reportes anteriores</summary><div></div></details>
+            <details id="regionalContext" hidden><summary>Ver el contexto regional</summary>
           <section
             id="regionCard"
             class="region-card"
@@ -236,7 +234,36 @@
               >
             </div>
           </section>
+            </details>
+          </aside>
         </div>
+        <div id="mapKey" class="map-key"></div>
+      </section>
+      <section class="climate-context" aria-label="El Niño en perspectiva">
+          <div class="climate-card" id="climateCard">
+            <div class="card-top">
+              <span class="eyebrow">Pronóstico de ENFEN</span
+              ><span class="card-icon" aria-hidden="true">≈</span>
+            </div>
+            <h2>El Niño costero</h2>
+            <p class="mag-label" id="magLabel">
+              Magnitud del calentamiento del mar
+            </p>
+            <strong id="magnitude" class="magnitude">Extraordinaria</strong>
+            <p id="outlook">
+              Se mantendría hasta febrero de 2027, según el comunicado del 13 de
+              noviembre.
+            </p>
+            <a
+              id="climateLink"
+              target="_blank"
+              rel="noopener"
+              href="https://repositorio.imarpe.gob.pe/items/d3746777-ec3a-466e-8d2c-3e4b9a4146e8"
+              ><span id="climateSource">ENFEN · 13 nov 2026</span
+              ><span aria-hidden="true">↗</span></a
+            >
+          </div>
+        <div class="history-copy"><span class="eyebrow">Perspectiva histórica</span><h2>¿Cómo se compara este episodio?</h2><p>Compara el calentamiento frente a nuestra costa con los episodios de 1982–83 y 1997–98.</p><button id="compareHistory" class="record-button">Comparar episodios <span aria-hidden="true">↗</span></button></div>
       </section>
       <section
         class="ocean-record"
@@ -365,6 +392,7 @@
               rel="noopener"
               >Natural Earth</a
             >
+            · Provincias y distritos según los <a href="https://geo.serfor.gob.pe/geoservicios/rest/services/Visor/Limites_Politicos_Administrativos/MapServer" target="_blank" rel="noopener">límites censales referenciales del INEI, edición 2024, servidos por SERFOR</a>
             · Temperatura por
             <a
               href="https://www.ncei.noaa.gov/products/optimum-interpolation-sst"
@@ -389,7 +417,7 @@
       <div id="dialogBody"></div>
     </dialog>
     <script type="module">
-      if (location.protocol !== "file:") import("./atlas-app.mjs?v=8");
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=9");
     </script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 # Perú al Día · El Niño hoy
 
-Piloto ciudadano con cartografía del Perú, observaciones del mar, intensidad del calentamiento y avisos oficiales por región. Las páginas y sus recursos públicos están en `public/`. La fecha de cada observación y la hora de consulta de cada fuente aparecen en la interfaz.
+Piloto ciudadano para consultar mediciones, impactos documentados y pronósticos desde Perú hasta provincia y distrito. Las páginas y sus recursos públicos están en `public/`. La fecha de cada observación y la hora de consulta de cada fuente aparecen en la interfaz.
 
 ## Uso local
 
@@ -13,17 +13,19 @@ node scripts/actualizar.mjs --sin-ia
 node scripts/servidor.mjs
 ```
 
-La portada se abre en `http://127.0.0.1:4173`. Para ejecutar el publicador local con su clave privada y la revisión periódica de fuentes:
+La portada se abre en `http://127.0.0.1:4173`. Para consultar periódicamente las fuentes en el servidor local:
 
 ```sh
-node --env-file=.env.local scripts/servidor.mjs --actualizar
+node scripts/servidor.mjs --actualizar
 ```
 
 ## Publicación
 
 GitHub Pages entrega únicamente la carpeta pública. GitHub Actions consulta las fuentes con la frecuencia configurada para cada conector. La ejecución depende de la disponibilidad del programador y de la entidad emisora. El archivo del panorama conserva la última lectura exitosa si un proveedor falla. Los visores que requieren consulta directa se presentan como enlaces. Los registros de agua y carreteras pueden tener causas distintas del fenómeno El Niño.
 
-Las capas de lluvias y ríos muestran avisos oficiales vigentes, próximos y reportes con menos de 72 horas sin vigencia definida. La capa Mar combina la anomalía térmica diaria de NOAA con los tramos que Hidrografía identifica en sus avisos de oleaje. El filtro regional incluye las jurisdicciones cuyo litoral cruza esos tramos. La ficha enlaza el aviso original y distingue los niveles que SENAMHI asigna a distintos sectores de una región.
+La portada distingue el último corte y el pronóstico. Agrupa los puntos por región y muestra el ámbito más específico documentado al acercarse. El rojo en un punto requiere un impacto grave reciente con evidencia. En Pronóstico, el amarillo, naranja y rojo siguen los polígonos y la vigencia que publicó SENAMHI. Los incidentes de días anteriores conservan enlaces y horas originales. La capa Mar combina la anomalía térmica diaria de NOAA con los tramos que Hidrografía identifica en sus avisos de oleaje. El filtro regional incluye las jurisdicciones cuyo litoral cruza esos tramos. La ficha enlaza el aviso original y distingue los niveles que SENAMHI asigna a distintos sectores de una región.
+
+Los partes horarios del radar distinguen la hora observada de las siguientes horas previstas. Las fichas locales pueden incluir una cronología del COEN o de la municipalidad y enlazar a la página del anexo. El catálogo de distritos y provincias usa límites censales referenciales INEI 2024 servidos por SERFOR. Los archivos por territorio se descargan al navegar.
 
 En Lluvias, la fecha que muestra cada mapa diario de SENAMHI determina cuándo corresponde el aviso a cada región. Si faltan días en la fuente, se conserva el alcance documentado del aviso. En el detalle nacional se puede abrir también el visor de lluvia de las próximas dos horas y consultar la fecha de su última observación.
 
@@ -33,7 +35,7 @@ El indicador de récord consulta diariamente la serie semanal de temperatura Ni�
 
 El publicador consulta también los PDF de lluvias intensas, quebradas, ríos y meteorología que reproduce el COEN. El mapa agrupa las dos publicaciones cuando el boletín identifica expresamente el número, el año y la serie de SENAMHI. Cada ficha conserva sus enlaces oficiales. Un documento con fechas de vigencia contradictorias permanece disponible para consulta y se excluye de la cobertura del mapa.
 
-Para ríos se cotejan el índice de SENAMHI, la capa de avisos numerados de su visor PHISIS y el cuadro nacional del COEN. La cobertura de la capa muestra la hora del parte, sus avisos y los que aparecieron después. GitHub solicita actualizar el sitio cada diez minutos. La hora de la última edición aparece en Avisos, con una indicación de demora al superar media hora.
+Para ríos se cotejan el índice de SENAMHI, la capa de avisos numerados de su visor PHISIS y el cuadro nacional del COEN. La cobertura de la capa muestra la hora del parte, sus avisos y los que aparecieron después. GitHub solicita actualizar el sitio cada diez minutos. El rótulo «Ahora» requiere dos ejecuciones reales consecutivas por horario con hasta 35 minutos de separación, la última en los últimos 35 minutos y una edición con hasta 30 minutos de antigüedad. En los demás casos, la portada indica «Último corte» y su hora. GitHub puede retrasar los horarios. La disponibilidad y la fecha de cada fuente se consultan por separado.
 
 Los boletines de las 07:00, 13:00 y 19:00 de Perú se preparan en la primera ejecución disponible del turno. La IA selecciona publicaciones oficiales. El publicador contrasta el guion con la transcripción antes de guardar la narración. Si la voz no se puede verificar, la edición sigue disponible en texto. Las solicitudes a OpenAI se realizan en el publicador. El archivo de audio se genera por edición y se comparte entre visitantes.
 

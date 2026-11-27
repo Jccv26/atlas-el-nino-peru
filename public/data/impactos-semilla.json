@@ -1,0 +1,746 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-27T02:19:11.390Z",
+  "events": [
+    {
+      "id": "rpp-24d541cf9782ae7efa",
+      "itemId": "rpp:https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035",
+      "sourceId": "rpp",
+      "kind": "prensa",
+      "source": "RPP",
+      "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035",
+      "title": "Piura: lluvia intensa ha inundado las principales calles de la ciudad [VIDEO]",
+      "region": "Piura",
+      "reportedAt": "2026-11-26T23:41:16.000Z",
+      "status": "reportado",
+      "summary": "Una corresponsal de RPP y videos recogidos por Andina documentaron calles anegadas en la ciudad de Piura durante la tarde. Andina sitúa el inicio de la lluvia cerca de las 17:00.",
+      "layer": "lluvias",
+      "revision": "ad7e8aebe1cdc127",
+      "timeline": [
+        {
+          "at": "2026-11-26T22:00:00.000Z",
+          "text": "Inicio aproximado de la lluvia según Andina.",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-piura-soporta-ahora-una-lluvia-torrencial-inunda-calles-y-afecta-zonas-vulnerables-1101610.aspx"
+        },
+        {
+          "at": "2026-11-26T23:13:09.000Z",
+          "text": "Andina publicó la nota.",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-piura-soporta-ahora-una-lluvia-torrencial-inunda-calles-y-afecta-zonas-vulnerables-1101610.aspx"
+        },
+        {
+          "at": "2026-11-26T23:41:16.000Z",
+          "text": "RPP publicó la nota.",
+          "source": "RPP",
+          "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035"
+        },
+        {
+          "at": "2026-11-27T00:01:10.000Z",
+          "text": "RPP actualizó su nota.",
+          "source": "RPP",
+          "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Nota original",
+          "source": "RPP",
+          "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035",
+          "date": "2026-11-26T23:41:16.000Z"
+        },
+        {
+          "type": "video",
+          "label": "Video en la nota original",
+          "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035",
+          "date": "2026-11-26T23:41:16.000Z",
+          "dateKind": "publicacion",
+          "source": "RPP"
+        },
+        {
+          "type": "documento",
+          "label": "Segundo reporte de la ciudad de Piura",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-piura-soporta-ahora-una-lluvia-torrencial-inunda-calles-y-afecta-zonas-vulnerables-1101610.aspx",
+          "date": "2026-11-26T23:13:09.000Z"
+        },
+        {
+          "type": "fotos",
+          "label": "Fotografía en Andina",
+          "source": "Andina / Difusión",
+          "url": "https://andina.pe/agencia/noticia-piura-soporta-ahora-una-lluvia-torrencial-inunda-calles-y-afecta-zonas-vulnerables-1101610.aspx",
+          "date": "2026-11-26T23:13:00.000Z",
+          "dateKind": "publicacion"
+        }
+      ],
+      "recommendations": [],
+      "contributors": [
+        {
+          "source": "RPP · corresponsal en Piura",
+          "url": "https://rpp.pe/peru/piura/piura-lluvia-intensa-ha-inundado-las-principales-calles-de-la-ciudad-noticia-1720035"
+        },
+        {
+          "source": "Andina · material de campo difundido en redes",
+          "url": "https://andina.pe/agencia/noticia-piura-soporta-ahora-una-lluvia-torrencial-inunda-calles-y-afecta-zonas-vulnerables-1101610.aspx"
+        }
+      ],
+      "pressSignature": "bad0cf470048256c",
+      "updatedAt": "2026-11-27T00:01:10.000Z",
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "locality": "Ciudad de Piura",
+      "province": "Piura",
+      "reviewedCase": "piura-ciudad-2026-11-26-tarde",
+      "corroborated": true,
+      "corroboratedClaim": "Calles anegadas en la ciudad de Piura durante la tarde del 26 de noviembre.",
+      "relatedItems": [
+        {
+          "id": "andina-85008970ba66fea900",
+          "revision": "886337b0a02b1ca0"
+        }
+      ],
+      "occurredAt": "2026-11-26T22:00:00.000Z",
+      "occurredAtPrecision": "aproximada"
+    },
+    {
+      "id": "coen-7a323694b3c2332bf9",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16498-26-11-2026-coen-indeci-0810-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-paimas-piura/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16498-26-11-2026-coen-indeci-0810-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-paimas-piura/",
+      "title": "Lluvias intensas en el distrito de Paimas – Piura",
+      "region": "Piura",
+      "district": "Paimas",
+      "reportedAt": "2026-11-26T22:55:00.000Z",
+      "status": "atendido",
+      "summary": "Activación de quebradas y afectación de vías.",
+      "editionNumber": "16509",
+      "layer": "lluvias",
+      "revision": "6553331456420652",
+      "timeline": [
+        {
+          "at": "2026-11-26T11:44:00.000Z",
+          "text": "Activación de quebradas y afectación de vías.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16498-26-11-2026-coen-indeci-0810-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-paimas-piura/"
+        },
+        {
+          "at": "2026-11-26T13:10:00.000Z",
+          "text": "COEN cita el parte anterior n.º 16498.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf"
+        },
+        {
+          "at": "2026-11-26T22:55:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16498-26-11-2026-coen-indeci-0810-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-paimas-piura/"
+        },
+        {
+          "at": "2026-11-26T22:55:00.000Z",
+          "text": "El parte registra el restablecimiento del tránsito en el tramo indicado.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf#page=2"
+        },
+        {
+          "at": "2026-11-26T22:55:00.000Z",
+          "text": "COEN comunica la atención de la emergencia y el cierre del reporte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16498-26-11-2026-coen-indeci-0810-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-paimas-piura/",
+          "date": "2026-11-26T22:55:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf",
+          "date": "2026-11-26T22:55:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf#page=6",
+          "date": "2026-11-26",
+          "dateKind": "anexo",
+          "page": 6,
+          "caption": "Lluvias intensas en el distrito de Paimas"
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf"
+        },
+        {
+          "source": "Municipalidad distrital",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf"
+        }
+      ],
+      "province": "Ayabaca",
+      "locality": "San Pedro",
+      "occurredAt": "2026-11-26T11:44:00.000Z",
+      "recovery": {
+        "text": "El parte registra el restablecimiento del tránsito en el tramo indicado.",
+        "at": "2026-11-26T22:55:00.000Z",
+        "source": "COEN · INDECI",
+        "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16509-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-PAIMAS-PIURA-2.pdf#page=2"
+      },
+      "resolved": true,
+      "priorReports": [
+        {
+          "number": "16498",
+          "at": "2026-11-26T13:10:00.000Z"
+        }
+      ],
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z"
+    },
+    {
+      "id": "coen-0d39d5d02c1ed82bbd",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16497-26-11-2026-coen-indeci-0750-horas-reporte-n-1-oleaje-anomalo-en-el-distrito-de-victor-larco-herrera-la-libertad/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16497-26-11-2026-coen-indeci-0750-horas-reporte-n-1-oleaje-anomalo-en-el-distrito-de-victor-larco-herrera-la-libertad/",
+      "title": "Oleaje anómalo en el distrito de Víctor Larco Herrera – La Libertad",
+      "region": "La Libertad",
+      "district": "Víctor Larco Herrera",
+      "reportedAt": "2026-11-26T21:52:00.000Z",
+      "status": "reportado",
+      "summary": "Afectación de vías y daños en viviendas.",
+      "layer": "mar",
+      "revision": "738bc77c35b19a77",
+      "timeline": [
+        {
+          "at": "2026-11-24T09:30:00.000Z",
+          "text": "Afectación de vías y daños en viviendas.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16497-26-11-2026-coen-indeci-0750-horas-reporte-n-1-oleaje-anomalo-en-el-distrito-de-victor-larco-herrera-la-libertad/"
+        },
+        {
+          "at": "2026-11-26T12:50:00.000Z",
+          "text": "COEN cita un parte anterior del mismo expediente.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16507-26NOV2026-OLEAJE-AN%C3%93MALO-EN-EL-DISTRITO-DE-V%C3%8DCTOR-LARCO-HERRERA-LA-LIBERTAD-2.pdf"
+        },
+        {
+          "at": "2026-11-26T21:52:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16497-26-11-2026-coen-indeci-0750-horas-reporte-n-1-oleaje-anomalo-en-el-distrito-de-victor-larco-herrera-la-libertad/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16497-26-11-2026-coen-indeci-0750-horas-reporte-n-1-oleaje-anomalo-en-el-distrito-de-victor-larco-herrera-la-libertad/",
+          "date": "2026-11-26T21:52:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16507-26NOV2026-OLEAJE-AN%C3%93MALO-EN-EL-DISTRITO-DE-V%C3%8DCTOR-LARCO-HERRERA-LA-LIBERTAD-2.pdf",
+          "date": "2026-11-26T21:52:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16507-26NOV2026-OLEAJE-AN%C3%93MALO-EN-EL-DISTRITO-DE-V%C3%8DCTOR-LARCO-HERRERA-LA-LIBERTAD-2.pdf#page=5",
+          "date": "2026-11-25",
+          "dateKind": "anexo",
+          "page": 5,
+          "caption": "Oleaje anómalo en el distrito de Víctor Larco Herrera"
+        }
+      ],
+      "recommendations": [],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16507-26NOV2026-OLEAJE-AN%C3%93MALO-EN-EL-DISTRITO-DE-V%C3%8DCTOR-LARCO-HERRERA-LA-LIBERTAD-2.pdf"
+        }
+      ],
+      "province": "Trujillo",
+      "locality": "Buenos Aires",
+      "occurredAt": "2026-11-24T09:30:00.000Z",
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "editionNumber": "16507"
+    },
+    {
+      "id": "coen-916f849aa7117c296c",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16452-25-11-2026-coen-indeci-1515-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-calana-tacna/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16452-25-11-2026-coen-indeci-1515-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-calana-tacna/",
+      "title": "Lluvias intensas en el distrito de Calana – Tacna",
+      "region": "Tacna",
+      "district": "Calana",
+      "reportedAt": "2026-11-26T21:15:00.000Z",
+      "status": "reportado",
+      "summary": "Daños en viviendas.",
+      "layer": "lluvias",
+      "revision": "9fb91c5df002c15f",
+      "timeline": [
+        {
+          "at": "2026-11-24T04:52:00.000Z",
+          "text": "Daños en viviendas.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16452-25-11-2026-coen-indeci-1515-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-calana-tacna/"
+        },
+        {
+          "at": "2026-11-25T20:15:00.000Z",
+          "text": "COEN cita un parte anterior del mismo expediente.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16504-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CALANA-TACNA-2.pdf"
+        },
+        {
+          "at": "2026-11-26T21:15:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16452-25-11-2026-coen-indeci-1515-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-calana-tacna/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16452-25-11-2026-coen-indeci-1515-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-calana-tacna/",
+          "date": "2026-11-26T21:15:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16504-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CALANA-TACNA-2.pdf",
+          "date": "2026-11-26T21:15:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16504-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CALANA-TACNA-2.pdf#page=4",
+          "date": "2026-11-24",
+          "dateKind": "anexo",
+          "page": 4,
+          "caption": "Lluvias intensas en el distrito de Calana"
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16504-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CALANA-TACNA-2.pdf"
+        },
+        {
+          "source": "Municipalidad distrital",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16504-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CALANA-TACNA-2.pdf"
+        }
+      ],
+      "province": "Tacna",
+      "locality": "Los Ángeles",
+      "occurredAt": "2026-11-24T04:52:00.000Z",
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "editionNumber": "16504"
+    },
+    {
+      "id": "andina-aca5e6c54b731673ac",
+      "itemId": "andina:https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx",
+      "sourceId": "andina",
+      "kind": "prensa",
+      "source": "Andina",
+      "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx",
+      "title": "Tumbes: Ejército despliega motobombas para evacuar aguas acumuladas tras lluvias intensas",
+      "region": "Tumbes",
+      "reportedAt": "2026-11-26T19:06:46.000Z",
+      "status": "reportado",
+      "summary": "Andina documentó viviendas anegadas y el despliegue de motobombas. Ubicó trabajos de drenaje en las avenidas Arica y Villa Naval de la ciudad de Tumbes.",
+      "layer": "lluvias",
+      "revision": "0785b72939a63af2",
+      "timeline": [
+        {
+          "at": "2026-11-26T01:00:00.000Z",
+          "text": "Inicio aproximado de las lluvias durante la noche del 25 de noviembre.",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx"
+        },
+        {
+          "at": "2026-11-26T11:00:00.000Z",
+          "text": "La lluvia terminó cerca de las 06:00 del jueves, según la nota. Los trabajos de drenaje continuaron.",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx"
+        },
+        {
+          "at": "2026-11-26T19:06:46.000Z",
+          "text": "Andina publicó la nota.",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Nota original",
+          "source": "Andina",
+          "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx",
+          "date": "2026-11-26T19:06:46.000Z"
+        },
+        {
+          "type": "fotos",
+          "label": "Fotografía acreditada en la nota",
+          "source": "Andina / Difusión",
+          "url": "https://andina.pe/agencia/noticia-tumbes-ejercito-despliega-motobombas-para-evacuar-aguas-acumuladas-tras-lluvias-intensas-1101569.aspx",
+          "date": "2026-11-26T19:06:00.000Z",
+          "dateKind": "publicacion"
+        }
+      ],
+      "recommendations": [],
+      "contributors": [],
+      "pressSignature": "cf42b3102eb7f9da",
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "locality": "Ciudad de Tumbes",
+      "province": "Tumbes",
+      "reviewedCase": "tumbes-ciudad-2026-11-26-drenaje",
+      "occurredAt": "2026-11-26T01:00:00.000Z",
+      "occurredAtPrecision": "aproximada"
+    },
+    {
+      "id": "coen-c77c1f1d9c2808e9a1",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-15229-30-10-2026-coen-indeci-0610-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-lurin-lima/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-15229-30-10-2026-coen-indeci-0610-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-lurin-lima/",
+      "title": "Lluvias intensas en el distrito de Lurín – Lima",
+      "region": "Lima Metropolitana",
+      "district": "Lurín",
+      "reportedAt": "2026-11-26T18:56:00.000Z",
+      "status": "reportado",
+      "summary": "",
+      "layer": "lluvias",
+      "revision": "dc62c21cf6e56358",
+      "timeline": [
+        {
+          "at": "2026-10-25T11:00:00.000Z",
+          "text": "Ocurrió el evento descrito en la ficha.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-15229-30-10-2026-coen-indeci-0610-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-lurin-lima/"
+        },
+        {
+          "at": "2026-11-26T18:56:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-15229-30-10-2026-coen-indeci-0610-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-lurin-lima/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-15229-30-10-2026-coen-indeci-0610-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-lurin-lima/",
+          "date": "2026-11-26T18:56:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/10/REPORTE-COMPLEMENTARIO-N.%C2%BA-16500-26NOV26-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-LUR%C3%8DN-LIMA-1.pdf",
+          "date": "2026-11-26T18:56:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/10/REPORTE-COMPLEMENTARIO-N.%C2%BA-16500-26NOV26-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-LUR%C3%8DN-LIMA-1.pdf#page=5",
+          "date": "2026-11-26T18:56:00.000Z",
+          "dateKind": "publicacion",
+          "page": 5
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [],
+      "province": "Lima",
+      "occurredAt": "2026-10-25T11:00:00.000Z",
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "editionNumber": "16500"
+    },
+    {
+      "id": "coen-3773ab941c70459ee4",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16492-26-11-2026-coen-indeci-0200-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-macari-puno/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16492-26-11-2026-coen-indeci-0200-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-macari-puno/",
+      "title": "Lluvias intensas en el distrito de Macarí – Puno",
+      "region": "Puno",
+      "district": "Macarí",
+      "reportedAt": "2026-11-26T07:00:00.000Z",
+      "status": "reportado",
+      "summary": "Afectación de vías.",
+      "layer": "lluvias",
+      "revision": "19c4e6570751df40",
+      "timeline": [
+        {
+          "at": "2026-11-16T18:30:00.000Z",
+          "text": "Afectación de vías.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16492-26-11-2026-coen-indeci-0200-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-macari-puno/"
+        },
+        {
+          "at": "2026-11-26T07:00:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16492-26-11-2026-coen-indeci-0200-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-macari-puno/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16492-26-11-2026-coen-indeci-0200-horas-reporte-n-o-1-lluvias-intensas-en-el-distrito-de-macari-puno/",
+          "date": "2026-11-26T07:00:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16492-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-MACAR%C3%8D-PUNO-1.pdf",
+          "date": "2026-11-26T07:00:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16492-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-MACAR%C3%8D-PUNO-1.pdf#page=4",
+          "date": "2026-11-18",
+          "dateKind": "anexo",
+          "page": 4,
+          "caption": "Lluvias intensas en el distrito de Macarí"
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16492-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-MACAR%C3%8D-PUNO-1.pdf"
+        }
+      ],
+      "province": "Melgar",
+      "occurredAt": "2026-11-16T18:30:00.000Z",
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "editionNumber": "16492"
+    },
+    {
+      "id": "coen-45e9acd5324cf3bdd9",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16491-26-11-2026-coen-indeci-0140-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-santa-lucia-puno/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16491-26-11-2026-coen-indeci-0140-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-santa-lucia-puno/",
+      "title": "Lluvias intensas en el distrito de Santa Lucia – Puno",
+      "region": "Puno",
+      "district": "Santa Lucia",
+      "reportedAt": "2026-11-26T06:40:00.000Z",
+      "status": "reportado",
+      "summary": "",
+      "layer": "lluvias",
+      "revision": "78e1f41645d9af58",
+      "timeline": [
+        {
+          "at": "2026-11-24T23:00:00.000Z",
+          "text": "Ocurrió el evento descrito en la ficha.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16491-26-11-2026-coen-indeci-0140-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-santa-lucia-puno/"
+        },
+        {
+          "at": "2026-11-26T06:40:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16491-26-11-2026-coen-indeci-0140-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-santa-lucia-puno/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-o-16491-26-11-2026-coen-indeci-0140-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-santa-lucia-puno/",
+          "date": "2026-11-26T06:40:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16491-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-SANTA-LUCIA-PUNO-1.pdf",
+          "date": "2026-11-26T06:40:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16491-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-SANTA-LUCIA-PUNO-1.pdf#page=4",
+          "date": "2026-11-24",
+          "dateKind": "anexo",
+          "page": 4,
+          "caption": "Lluvias intensas en el distrito de Santa Lucia"
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16491-26NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-SANTA-LUCIA-PUNO-1.pdf"
+        }
+      ],
+      "province": "Lampa",
+      "occurredAt": "2026-11-24T23:00:00.000Z",
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z",
+      "editionNumber": "16491"
+    },
+    {
+      "id": "coen-a05014180a54014ce6",
+      "itemId": "coen:https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16362-23-11-2026-coen-indeci-2340-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-chulucanas-piura/",
+      "sourceId": "coen",
+      "kind": "oficial",
+      "source": "COEN · INDECI",
+      "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16362-23-11-2026-coen-indeci-2340-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-chulucanas-piura/",
+      "title": "Lluvias intensas en el distrito de Chulucanas – Piura",
+      "region": "Piura",
+      "district": "Chulucanas",
+      "reportedAt": "2026-11-24T23:50:00.000Z",
+      "status": "reportado",
+      "summary": "Afectación de vías y daños en viviendas.",
+      "editionNumber": "16393",
+      "layer": "lluvias",
+      "revision": "25b0ea22a69185a8",
+      "timeline": [
+        {
+          "at": "2026-11-22T23:40:00.000Z",
+          "text": "Afectación de vías y daños en viviendas.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16362-23-11-2026-coen-indeci-2340-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-chulucanas-piura/"
+        },
+        {
+          "at": "2026-11-24T04:40:00.000Z",
+          "text": "COEN cita el parte anterior n.º 16362.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16393-24NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CHULUCANAS-PIURA-2.pdf"
+        },
+        {
+          "at": "2026-11-24T23:50:00.000Z",
+          "text": "COEN publicó este parte.",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16362-23-11-2026-coen-indeci-2340-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-chulucanas-piura/"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "documento",
+          "label": "Ficha de la emergencia",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/emergencias/reporte-complementario-n-16362-23-11-2026-coen-indeci-2340-horas-reporte-n-1-lluvias-intensas-en-el-distrito-de-chulucanas-piura/",
+          "date": "2026-11-24T23:50:00.000Z"
+        },
+        {
+          "type": "documento",
+          "label": "Reporte oficial en PDF",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16393-24NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CHULUCANAS-PIURA-2.pdf",
+          "date": "2026-11-24T23:50:00.000Z",
+          "dateKind": "publicacion"
+        },
+        {
+          "type": "fotos",
+          "label": "Anexo fotográfico",
+          "source": "COEN · INDECI",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16393-24NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CHULUCANAS-PIURA-2.pdf#page=6",
+          "date": "2026-11-23",
+          "dateKind": "anexo",
+          "page": 6,
+          "caption": "Lluvias intensas en el distrito de Chulucanas"
+        }
+      ],
+      "recommendations": [
+        {
+          "text": "Evita cruzar cauces de ríos, quebradas y zonas inundadas.",
+          "source": "INDECI",
+          "url": "https://www.gob.pe/institucion/indeci/noticias/1369382-indeci-brinda-recomendaciones-ante-temporada-de-lluvias-intensas"
+        }
+      ],
+      "contributors": [
+        {
+          "source": "Centro de Operaciones de Emergencia Regional (COER)",
+          "url": "https://portal.indeci.gob.pe/wp-content/uploads/2026/11/REPORTE-COMPLEMENTARIO-N.%C2%BA-16393-24NOV2026-LLUVIAS-INTENSAS-EN-EL-DISTRITO-DE-CHULUCANAS-PIURA-2.pdf"
+        }
+      ],
+      "province": "Morropón",
+      "occurredAt": "2026-11-22T23:40:00.000Z",
+      "priorReports": [
+        {
+          "number": "16362",
+          "at": "2026-11-24T04:40:00.000Z"
+        }
+      ],
+      "pdfVerified": true,
+      "checkedAt": "2026-11-27T02:19:11.390Z"
+    }
+  ]
+}

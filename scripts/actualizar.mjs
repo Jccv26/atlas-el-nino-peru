@@ -2,6 +2,7 @@ import {mkdir, readFile, rename, stat, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {actualizarSectores} from '../lib/sectores-senamhi.mjs';
 import {refreshPanorama} from '../lib/panorama.mjs';
 import {generateExplanations} from '../lib/explicaciones.mjs';
 
@@ -24,6 +25,7 @@ export async function save(file, value) {
 export async function actualizar({force = false, ai = true, bulletin: buildBulletin = true} = {}) {
   const previous = await readJSON(destination, {});
   const snapshot = await refreshPanorama(previous, {force});
+  await actualizarSectores(snapshot.items,dataDir,new Date(snapshot.updatedAt));
   if (buildBulletin && snapshot.sources.some(s => s.kind === 'oficial' && s.status === 'ok')) {
     try {
       const {generateBulletin,apiCreditActive} = await import('../lib/boletines.mjs');
