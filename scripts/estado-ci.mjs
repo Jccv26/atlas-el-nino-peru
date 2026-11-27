@@ -13,6 +13,7 @@ import { apiCreditActive, generateBulletin } from '../lib/boletines.mjs';
 import { generateExplanations, explanationBatchMaxUsd } from '../lib/explicaciones.mjs';
 import { refreshPanorama, reuseDetail } from '../lib/panorama.mjs';
 import {mergedRadar} from '../lib/radar-ahora.mjs';
+import {enrichPressVisuals} from '../lib/medios-visuales.mjs';
 import {radarDescriptor,radarReadingItems,editionOriginalIndex} from '../lib/edicion-local.mjs';
 import { verificarPublico } from './verificar-publico.mjs';
 
@@ -336,6 +337,7 @@ export async function mirrorPublic(root, cache, now, restore, seed = null) {
       let edition;
       try {edition=JSON.parse(data);} catch { /* Keep the verified edition from main. */ }
       panorama=mergePanorama(seed,edition,now);
+      await enrichPressVisuals(panorama,seed,{now:new Date(now),limit:0});
       // A seed and the data branch can have seen different documents between runs.
       // Preserve verified originals even when this merge replaces a source's list.
       panorama.sharedOriginals=await editionOriginalIndex(panorama,seed,edition);

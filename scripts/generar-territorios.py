@@ -91,7 +91,10 @@ def main():
                 raise ValueError(f'UBIGEO incompatible: {code}')
             name = display_name(a[name_field]); d,box,center = geometry(row['geometry'])
             groups[parent].append(dict(id=code,name=name,d=d,box=box))
-            catalog[key].append(dict(id=code,name=name,center=center)); codes.add(code)
+            place=dict(id=code,name=name,center=center)
+            if key=='provinces':
+                place['box']=box
+            catalog[key].append(place); codes.add(code)
         if {code[:-2] for code in codes} != parents or len(codes) < (196 if layer=='provincias' else 1891):
             raise ValueError('Faltan unidades de la cartografía nacional')
         catalog[key].sort(key=lambda x:x['id']); parents=codes

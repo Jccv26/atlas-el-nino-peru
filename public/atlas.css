@@ -246,11 +246,16 @@ button:hover:not(:disabled) {
   color: var(--aqua);
 }
 .layer-switch {
+  position: relative;
+  isolation: isolate;
   display: flex;
   padding: 3px;
   gap: 2px;
 }
 .layer-switch button {
+  transition: none;
+  position: relative;
+  z-index: 1;
   min-width: 60px;
   padding: 5px 14px;
   border-radius: 5px;
@@ -261,6 +266,30 @@ button:hover:not(:disabled) {
 .layer-switch .selected:hover {
   background: var(--aqua);
   color: #0c3033;
+}
+.layer-indicator {
+  display: none;
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  background: var(--aqua);
+  border-radius: 5px;
+  transform-origin: left center;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .layer-switch[data-slide-to] .layer-indicator { display: block; }
+  .layer-switch[data-slide-to] button[data-layer] {
+    background: transparent;
+    color: white;
+    mix-blend-mode: difference;
+  }
+}
+@media (forced-colors: active) {
+  .layer-switch button[aria-pressed="true"] {
+    text-decoration: underline 2px;
+    text-underline-offset: 3px;
+  }
 }
 .climate-card {
   left: var(--edge);
@@ -719,6 +748,16 @@ dialog p {
   line-height: 1.55;
   font-size: 14px;
 }
+dialog .record-lead {font-size:16px;color:#e5eee9;margin-bottom:10px}
+dialog .record-source {color:#a6c7c4;font-size:13px}
+.record-dates {margin:8px 0 16px}
+.record-dates > div {display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;padding:6px 0;border-bottom:1px solid #355157;font-size:13px}
+.record-dates dt {color:#abc9c5}
+.record-dates dd {margin:0;font-variant-numeric:tabular-nums}
+.record-sources {border-top:1px solid #456269;margin-top:20px}
+.record-sources ul {list-style:none;margin:8px 0 0;padding:0}
+.record-sources li {padding:3px 0}
+.record-sources li small {display:block;color:#b3cac5;line-height:1.45}
 dialog h3 {
   font-size: 16px;
   margin: 18px 0 4px;

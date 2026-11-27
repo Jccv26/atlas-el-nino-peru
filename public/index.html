@@ -22,9 +22,11 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="./atlas.css?v=4" />
-    <link rel="stylesheet" href="./mapa-interaccion.css?v=6" />
-    <link rel="stylesheet" href="./situacion.css?v=3" />
+    <link rel="stylesheet" href="./atlas.css?v=6" />
+    <link rel="stylesheet" href="./mapa-interaccion.css?v=7" />
+    <link rel="stylesheet" href="./situacion.css?v=4" />
+    <link rel="stylesheet" href="./limites.css" />
+    <link rel="stylesheet" href="./material-visual.css" />
   </head>
   <body>
     <aside id="fileEntry" class="file-entry" hidden>
@@ -70,8 +72,8 @@
         ><input
           type="search"
           id="searchInput"
-          placeholder="Buscar región, provincia o distrito"
-          aria-label="Buscar región, provincia o distrito"
+          placeholder="Buscar región o provincia"
+          aria-label="Buscar región o provincia"
           maxlength="100"
           list="places"
         /><datalist id="places"></datalist
@@ -158,17 +160,18 @@
               </select>
             </label>
             <div class="layer-switch" role="group" aria-label="Capas del mapa">
-              <button class="selected" data-layer="mar" aria-pressed="true">
-                Mar</button
+              <span class="layer-indicator" aria-hidden="true"></span>
+              <button class="selected" data-layer="todo" aria-pressed="true">Todo</button
+              ><button data-layer="mar" aria-pressed="false">Mar</button
               ><button data-layer="lluvias" aria-pressed="false">Lluvias</button
               ><button data-layer="rios" aria-pressed="false">Ríos</button>
             </div>
           </div>
           <div class="hazard-choice" id="hazardChoice" role="group" aria-label="Área de peligro a dibujar" hidden><button data-hazard="lluvias" aria-pressed="true">Lluvia en 24 h</button><button data-hazard="quebradas" aria-pressed="false">Quebradas</button></div>
           <div class="map-legend" id="mapLegend" aria-live="polite">
-            <div id="legendTitle">Anomalía térmica del mar · °C</div>
-            <div class="scale-bar" id="scaleBar"></div>
-            <div class="scales" id="scales">
+            <div id="legendTitle">Impactos y mediciones</div>
+            <div class="scale-bar" id="scaleBar" hidden></div>
+            <div class="scales" id="scales" hidden>
               <span>−4</span><span>0</span><span>+4</span><span>+8</span>
             </div>
             <button
@@ -184,13 +187,7 @@
               Acerca de esta capa <span>ⓘ</span>
             </button>
           </div>
-          <div class="map-tools">
-            <button id="zoomIn" aria-label="Acercar el mapa">+</button
-            ><button id="zoomOut" aria-label="Alejar el mapa">−</button
-            ><button id="resetView" aria-label="Volver a la vista nacional">
-              ⌖
-            </button>
-          </div>
+          <button id="mapBack" class="map-return" type="button" hidden>← Ver todo el Perú</button>
           <div id="mapHint" class="map-hint">
             Selecciona una región para ver sus avisos
           </div>
@@ -203,6 +200,17 @@
               <div id="sharePlace"></div>
             </div>
             <label id="areaSelectLabel" class="area-select" hidden><span id="areaSelectTitle"></span><select id="areaSelect"></select></label>
+            <section id="nationalImpacts" class="area-brief" aria-labelledby="nationalImpactsTitle" hidden>
+              <h3 id="nationalImpactsTitle">Regiones con impactos recientes</h3>
+              <p class="brief-cut">Impactos y restablecimientos de las últimas 24 horas según la fecha del hecho o del reporte. Hora de Perú.</p>
+              <div id="nationalImpactRows"></div>
+            </section>
+            <section id="areaBrief" class="area-brief" aria-labelledby="areaBriefTitle" hidden>
+              <h3 id="areaBriefTitle">Resumen del lugar</h3>
+              <p id="areaBriefCut" class="brief-cut"></p>
+              <div id="areaBriefFacts"></div>
+              <div id="areaBriefVisual"></div>
+            </section>
             <div class="pane-heading"><h3 id="signalsTitle">Reportes del último corte</h3><span id="signalsCount"></span></div>
             <p id="sourceFreshness" class="source-freshness" hidden></p>
             <div id="localSignals" class="local-signals" aria-live="polite"></div>
@@ -238,6 +246,10 @@
               >
             </div>
           </section>
+            </details>
+            <details id="areaBriefSources" class="area-brief-sources" hidden>
+              <summary>Fuentes y documentos del lugar</summary>
+              <ul></ul>
             </details>
           </aside>
         </div>
@@ -438,7 +450,7 @@
       <div id="dialogBody"></div>
     </dialog>
     <script type="module">
-      if (location.protocol !== "file:") import("./atlas-app.mjs?v=15");
+      if (location.protocol !== "file:") import("./atlas-app.mjs?v=17");
     </script>
   </body>
 </html>

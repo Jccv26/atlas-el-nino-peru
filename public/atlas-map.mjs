@@ -1,5 +1,6 @@
 import { OCEAN_SOURCE } from "./atlas/oceano.mjs";
-import {localMap} from "./mapa-local.mjs?v=2";
+import {localMap} from "./mapa-local.mjs?v=4";
+import {combinedLabels} from "./capa-todo.mjs";
 import {editionAsset} from "./publicacion.mjs";
 const svgNS = "http://www.w3.org/2000/svg";
 const svg = (tag, props = {}) => {
@@ -97,7 +98,7 @@ export const mapCities = labelData
 // size in screen pixels as the user moves between national and regional views.
 export function createCamera(map, onDraw) {
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  const maxZoom = 130;
+  const maxZoom = 28;
   let width,
     height,
     baseHeight,
@@ -115,8 +116,12 @@ export function createCamera(map, onDraw) {
     map.setAttribute("viewBox", [x - w / 2, y - h / 2, w, h].join(" "));
     map.classList.toggle("map-zoomed", next.z > 1.02);
     map.classList.toggle("atlas-detail-view", next.z >= 4);
-    $("zoomIn").disabled = next.z >= maxZoom - 0.01;
-    $("zoomOut").disabled = next.z <= 1.01;
+    const mask = $("seaMask");
+    if (mask?.setAttribute) {
+      // Limit the intermediate thermal mask to the screen at every zoom level.
+      for (const [name,value] of [["x",x-w/2],["y",y-h/2],["width",w],["height",h]])
+        mask.setAttribute(name,value);
+    }
     onDraw(w / width);
   }
   function stop() {
@@ -135,8 +140,9 @@ export function createCamera(map, onDraw) {
     }
     const start = { ...state },
       startTime = performance.now();
+    const duration = frame?.local ? 330 : 400;
     function tick(now) {
-      const t = Math.min(1, (now - startTime) / 490);
+      const t = Math.min(1, (now - startTime) / duration);
       const ease = t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
       draw({
         x: start.x + (next.x - start.x) * ease,
@@ -149,11 +155,11 @@ export function createCamera(map, onDraw) {
     animation = requestAnimationFrame(tick);
   }
   function fitDestination({box,local}) {
-    const available = local ? 0.76 : 0.68;
+    const available = local ? 0.55 : 0.68;
     const z = nearest(
       Math.min(
         (((baseHeight * width) / height) * available) / Math.max(0.015, box.width),
-        (baseHeight * 0.62) / Math.max(0.015, box.height),
+        (baseHeight * (local?0.50:0.62)) / Math.max(0.015, box.height),
       ), 1.3, local ? maxZoom : 12,
     );
     return {x:box.x+box.width/2, y:box.y+box.height/2, z};
@@ -167,17 +173,19 @@ export function createCamera(map, onDraw) {
     width = box.width;
     height = box.height;
     const ratio = width / height;
-    baseHeight =
-      width < 761
-        ? Math.max(22, 20.7 / ratio)
-        : Math.min(22.7, Math.max(20.4, 49 / ratio));
+    // Frame the national boundary (roughly 13 by 18.4 map units) with
+    // room for the map controls in both orientations.
+    baseHeight = Math.max(20.9, 17.3 / ratio);
+    const perPixel=baseHeight/height;
+    const roomToEast=30.3+baseHeight*ratio/2-36.357-12*perPixel;
+    const shiftWest=ratio<1 ? Math.max(0,Math.min(28*perPixel,roomToEast)) : 0;
     home = {
-      x: 30.3,
-      y: width < 761 ? 15 : 14.65,
+      x: 30.3-shiftWest,
+      y: 15.1,
       z: 1,
     };
     // A rotation can arrive mid-flight. Refit the selected territory for the
-    // new aspect ratio; a user-controlled camera keeps its geographic center.
+    // new aspect ratio before the next draw.
     const destination = frame ? fitDestination(frame) : target?.z > 1.01 ? target : home;
     move(destination, false, frame);
   }
@@ -190,11 +198,6 @@ export function createCamera(map, onDraw) {
     home: () => move(home),
     stop,
     snapshot: () => ({ ...state, scale: baseHeight / (state.z * height) }),
-    pan: (x, y) => draw({ x, y, z: state.z }),
-    zoomBy(factor) {
-      const target = nearest((goal?.z ?? state.z) * factor, 1, maxZoom);
-      move(target === 1 ? home : { ...state, z: target });
-    },
     reveal(point) {
       const view = map.viewBox.baseVal;
       if (
@@ -327,19 +330,26 @@ function oceanCell(grid, point) {
 export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
   const map = $("map"),
     frame = map.parentElement,
-    geo = await fetch("./atlas/geografia.json", opt).then((r) => {
+    geo = await fetch("./atlas/geografia.json?v=2", opt).then((r) => {
       if (!r.ok) throw Error("geografía");
       return r.json();
     });
   geo.land.forEach((l) => {
     $("landMask").append(svg("path", { d: l.d }));
     $("countryLines").append(svg("path", { d: l.d, class: "country-path" }));
+    if (l.name === "Peru") {
+      const outline=svg("g",{class:"peru-outline","aria-hidden":"true","pointer-events":"none"});
+      for(const kind of ["casing","edge"])
+        outline.append(svg("path",{d:l.d,class:kind,"fill":"none","vector-effect":"non-scaling-stroke"}));
+      $("mapWorld").insertBefore(outline,$("mapLabels"));
+    }
   });
   const regions = new Map();
   const names = geo.regions
     .map((r) => r.name)
     .sort((a, b) => a.localeCompare(b, "es"));
   const anchors = new Map();
+  const clearance = new Map();
   const regionGroup = $("regions");
   regionGroup.setAttribute("role", "group");
   regionGroup.setAttribute("aria-label", "Regiones del Perú");
@@ -364,8 +374,26 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     });
     regionGroup.append(path);
     regions.set(r.name, path);
-    anchors.set(r.name, regionAnchor(path));
+    if (r.labelCircle) {
+      const [x,y,radius]=r.labelCircle;
+      anchors.set(r.name,new DOMPoint(x,y));
+      clearance.set(r.name,radius);
+    } else anchors.set(r.name, regionAnchor(path));
   });
+  const impactRows=$("nationalImpactRows");
+  let previewed;
+  function previewRegion(target) {
+    const row=target?.closest?.("button[data-region]");
+    const next=impactRows.contains(row) ? regions.get(row?.dataset.region) : null;
+    if(previewed===next)return;
+    previewed?.classList.remove("region-from-list");
+    next?.classList.add("region-from-list");
+    previewed=next;
+  }
+  impactRows.addEventListener("focusin",e=>previewRegion(e.target));
+  impactRows.addEventListener("focusout",e=>previewRegion(e.relatedTarget));
+  impactRows.addEventListener("pointerover",e=>{if(e.pointerType==="mouse")previewRegion(e.target);});
+  impactRows.addEventListener("pointerleave",()=>previewRegion(document.activeElement));
   labelData.forEach(([label, lon, lat, size, kind, region]) => {
     const group =
       kind === "city"
@@ -402,6 +430,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
       kind === "city" ? 11 : kind === "nation" ? 17 : 13,
     );
     if (kind === "ocean") {
+      t.setAttribute("text-anchor","start");
       t.style.fill = "#d5e3de";
       t.style.letterSpacing = ".13px";
       t.style.fontStyle = "italic";
@@ -465,7 +494,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
         "pointer-events": "all",
       }),
     );
-    return { name, group, bounds: regions.get(name).getBBox() };
+    return {name,group};
   }
   const compactTags = [
     // Both touch targets sit offshore, clear of the inland regions and Lima city.
@@ -509,6 +538,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     sample = null;
   let counts = new Map(),
     states = null,
+    regionMarks = null,
     upcoming = null,
     loaded = false,
     drag = null,
@@ -523,13 +553,21 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     );
   }
   let localOverlay;
+  const oceanLabel=map.querySelector(".map-label.ocean");
   function paintMarks(nextUnit) {
     unit = nextUnit;
+    if (!selected && !map.classList.contains("map-zoomed")) {
+      const view=map.viewBox.baseVal;
+      const size=Math.min(16,Math.max(9,view.width/unit*.026));
+      oceanLabel.setAttribute("x",Math.max(12,view.x+12*unit));
+      oceanLabel.setAttribute("font-size",size*unit);
+      oceanLabel.style.letterSpacing=size*unit*.12+"px";
+    }
     localOverlay?.scale(unit);
-    compactTags.forEach(({ name, group, bounds }) => {
+    compactTags.forEach(({ name, group }) => {
       pin(group, anchors.get(name));
       // Hiding the entire group also removes its larger transparent touch target.
-      group.style.display = !selected && bounds.width / unit < 35 ? "" : "none";
+      group.style.display = selected ? "none" : "";
     });
     if (selected)
       pin(
@@ -550,7 +588,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
     if (layer === "mar" && !coast.has(name))
       return "Territorio del interior del Perú";
     const theme =
-      { mar: "Mar", rios: "Ríos", lluvias: "Lluvias" }[layer] ?? layer;
+      { todo: "Mar, lluvias y ríos", mar: "Mar", rios: "Ríos", lluvias: "Lluvias" }[layer] ?? layer;
     if (!loaded) return theme + " · Consultando publicaciones…";
     const number = counts.get(name) || 0;
     if (!number) return theme + " · Sin publicaciones regionales en esta capa";
@@ -571,6 +609,8 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
           (breakdown.recent === 1 ? " reciente" : " recientes"),
       );
     const total = number + (number === 1 ? " reporte" : " reportes");
+    if (layer==="todo" && regionMarks?.has(name))
+      return combinedLabels[regionMarks.get(name)] + " · " + total;
     return (
       theme +
       " · " +
@@ -655,6 +695,7 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
   function select(name, city = "") {
     if (name && !regions.has(name)) return;
     if (name === selected && city === selectedCity) return;
+    previewRegion(null);
     hideTip();
     if (selected) {
       const previous = regions.get(selected);
@@ -684,19 +725,6 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
       announce.textContent = "Vista nacional del Perú.";
     }
   }
-  $("zoomIn").onclick = () => {
-    hideTip();
-    camera.zoomBy(1.5);
-  };
-  $("zoomOut").onclick = () => {
-    hideTip();
-    camera.zoomBy(1 / 1.5);
-  };
-  $("resetView").onclick = () => {
-    hideTip();
-    if (selected) onRegion("");
-    else camera.home();
-  };
   function focusTip(name) {
     const pt = anchors.get(name).matrixTransform(map.getScreenCTM());
     const b = map.getBoundingClientRect();
@@ -772,56 +800,34 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
       else camera.home();
     }
   });
-  map.addEventListener("pointerdown", (e) => {
-    if (!e.isPrimary || e.button !== 0) return;
-    keyboardRegion = "";
-    camera.stop();
-    const current = camera.snapshot();
-    drag = {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      current,
-      moved: false,
-      canPan: e.pointerType !== "touch" || current.z > 1.02,
-    };
-    skipClick = false;
+  map.addEventListener("pointerdown", e => {
+    if (!e.isPrimary || e.button!==0) return;
+    keyboardRegion="";
+    drag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+    skipClick=false;
   });
-  map.addEventListener("pointermove", (e) => {
-    if (drag?.id === e.pointerId && e.buttons) {
-      const dx = e.clientX - drag.x,
-        dy = e.clientY - drag.y;
-      if (Math.hypot(dx, dy) <= 7 && !drag.moved) return;
-      drag.moved = true;
+  map.addEventListener("pointermove", e => {
+    if(drag?.id===e.pointerId && Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>7) {
+      drag.moved=true;
       hideTip();
-      if (!drag.canPan) return;
-      map.classList.add("atlas-dragging");
-      if (!map.hasPointerCapture(e.pointerId))
-        map.setPointerCapture(e.pointerId);
-      const { x, y, scale } = drag.current;
-      camera.pan(x - dx * scale, y - dy * scale);
-    } else if (e.pointerType !== "touch") {
-      keyboardRegion = "";
-      inspect(e);
-    }
+    } else if(!drag && e.pointerType!=="touch") inspect(e);
   });
-  function endDrag(e) {
-    if (drag?.id !== e.pointerId) return;
-    skipClick = drag.moved;
-    drag = null;
-    map.classList.remove("atlas-dragging");
+  function endGesture(e) {
+    if(drag?.id!==e.pointerId)return;
+    skipClick=drag.moved || e.type==="pointercancel";
+    drag=null;
   }
-  map.addEventListener("pointerup", endDrag);
-  map.addEventListener("pointercancel", endDrag);
-  map.addEventListener("pointerleave", (e) => {
-    if (e.pointerType !== "touch") hideTip();
-    if (drag && !drag.moved && !map.hasPointerCapture(e.pointerId)) endDrag(e);
+  map.addEventListener("pointerup",endGesture);
+  map.addEventListener("pointercancel",endGesture);
+  map.addEventListener("pointerleave",e=>{
+    if(e.pointerType!=="touch")hideTip();
+    if(drag?.id===e.pointerId && e.pointerType!=="touch"){drag=null;skipClick=true;}
   });
+  // Suppress the synthetic click before it reaches a marker as well as a boundary.
+  map.addEventListener("click",e=>{
+    if(skipClick && e.detail!==0){e.preventDefault();e.stopPropagation();skipClick=false;}
+  },true);
   map.addEventListener("click", (e) => {
-    if (skipClick) {
-      skipClick = false;
-      return;
-    }
     if (e.target.closest(".signal-pin")) return;
     const area = e.target.closest("[data-area]")?.dataset.area;
     if (area) {hideTip();onArea(area);return;}
@@ -916,9 +922,13 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
   return {
     refreshOcean,
     local(scope, signals, notices, index) {
+      const provincial=Boolean(scope.area);
+      map.classList.toggle("atlas-province-view",provincial);
+      regionGroup.setAttribute("aria-hidden",String(provincial));
+      regions.get(tabRegion)?.setAttribute("tabindex",provincial?"-1":"0");
       void localOverlay.scope(scope.region,scope.area,index);
-      localOverlay.markers(signals,index,name=>anchors.get(name),scope);
-      void localOverlay.sectors(notices,Date.now());
+      localOverlay.markers(signals,index,name=>anchors.get(name),scope,clearance);
+      void localOverlay.sectors(notices,Date.now(),scope.area && index?.byId.get(scope.area.slice(0,4)));
       frame.classList.toggle("has-local-area",Boolean(scope.area));
     },
     regionNames: names,
@@ -928,10 +938,13 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
       layer = nextLayer;
       counts = nextCounts;
       states = options.regionStatus ?? null;
+      regionMarks = options.regionMarks ?? null;
       upcoming = options.upcomingCounts ?? null;
       loaded = options.loaded ?? true;
       frame.dataset.mapLayer = layer;
       $("thermal").style.display = layer === "mar" ? "" : "none";
+      const combined={grave:"#ee7775b8",impacto:"#e8a052a3",reportado:"#afac8694",
+        restablecido:"#79bc9896",observacion:"#83bdd396",pronostico:"#a3a3d588"};
       regions.forEach((path, name) => {
         const tinted =
           (layer !== "mar" || coast.has(name)) && (counts.get(name) || 0) > 0;
@@ -940,7 +953,10 @@ export async function createMap({ onRegion, onOceanReady, onArea, onGroup }) {
           rios: "#50d9c6a6",
           lluvias: "#91b9f3ab",
         };
-        path.style.fill = tinted ? fills[layer] : "transparent";
+        const fill=layer==="todo" ? combined[options.regionMarks?.get(name)] || "transparent" :
+          tinted ? fills[layer] : "transparent";
+        path.style.fill=fill;
+        path.style.setProperty("--region-fill",fill);
         path.setAttribute(
           "aria-label",
           regionLabel(name) + ". " + status(name),

@@ -1,7 +1,7 @@
 // The public link works when the current page is a preview, localhost or a file.
 // Rebuild from the selected map state so unrelated query parameters stay local.
 import {publicAddress} from './publicacion.mjs';
-const layers = new Set(['lluvias', 'rios', 'mar']);
+const layers = new Set(['todo', 'lluvias', 'rios', 'mar']);
 const placeName = /^[\p{L}\p{M}][\p{L}\p{M}\d .’'()-]{0,79}$/u;
 const oneLine = (value, length) => typeof value === 'string'
   ? value.replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, length)

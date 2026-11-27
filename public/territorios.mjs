@@ -11,7 +11,8 @@ export function territoryIndex(data) {
     names.get(key).push(place);
   }
   function regionOf(id) {
-    return id?.startsWith("1501") ? "Lima Metropolitana" : byId.get(id?.slice(0,2))?.name || "";
+    if(!byId.has(id))return "";
+    return id.startsWith("1501") ? "Lima Metropolitana" : byId.get(id.slice(0,2))?.name || "";
   }
   function department(region) {
     return region === "Lima Metropolitana" || region === "Lima" ? "15" : (names.get(normalizePlace(region)) || []).find(p => p.id.length === 2)?.id;
@@ -23,22 +24,20 @@ export function territoryIndex(data) {
   function resolve(region, province, district) {
     const dep = department(region);
     if (!dep) return "";
-    const prov = region === "Lima Metropolitana" ? "1501" : match(province,4,dep);
+    const prov = region === "Lima Metropolitana" && !province ? "1501" : match(province,4,dep);
+    if(region==="Lima Metropolitana" && prov!=="1501")return "";
     // An explicitly named, unmatched province cannot be silently substituted.
     return (district && (!province || prov) && match(district,6,prov || dep)) || prov || dep;
   }
   function children(region, id = "") {
-    if (!region || id.length === 6) return [];
-    const prefix = id || (region === "Lima Metropolitana" ? "1501" : department(region));
-    if (!prefix) return [];
-    const pool = prefix.length === 4 ? data.districts : data.provinces;
-    return pool.filter(p => p.id.startsWith(prefix) && (region !== "Lima" || !p.id.startsWith("1501")));
+    if (!region || id.length>=4) return [];
+    return data.provinces.filter(p=>regionOf(p.id)===region);
   }
   function label(id) {
     const chain = [id, id.slice(0,4), id.slice(0,2)];
     return [...new Set(chain)].map(code=>byId.get(code)?.name).filter(Boolean).join(" · ");
   }
-  return {byId, names, regionOf, resolve, children, department, label, places};
+  return {byId, names, regionOf, resolve, children, department, label, places, provinces:data.provinces};
 }
 export async function loadTerritories() {
   const res = await fetch(new URL("./atlas/territorios/catalogo.json", import.meta.url));

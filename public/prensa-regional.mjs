@@ -29,7 +29,7 @@ function namedRegions(item) {
   // Earlier feeds assigned places by broad keywords as well. For those
   // editions, only retain a named department visible in the actual headline.
   const title=' '+simple(item.title)+' ';
-  return [...new Set(supplied.filter(r => regions.has(r) && (item.regionOrigin==='titular-prensa' || title.includes(' '+simple(r)+' '))))];
+  return [...new Set(supplied.filter(r => regions.has(r) && (item.regionOrigin==='titular-prensa' || item.regionOrigin==='nota-original-prensa' || title.includes(' '+simple(r)+' '))))];
 }
 function publisherRegion(source,item) {
   const place=source.publisherRegion || item.publisherRegion || olderPublishers.get(source.id);

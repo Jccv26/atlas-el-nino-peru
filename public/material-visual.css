@@ -1,0 +1,7 @@
+.visual-evidence {display:grid;gap:.55rem;min-width:0;margin:.8rem 0}
+.visual-evidence:empty {display:none}
+.visual-evidence details {min-width:0;border:1px solid var(--line,#9caeb3);border-radius:9px;overflow:hidden}
+.visual-evidence summary {cursor:pointer;padding:.75rem .9rem;font-weight:600;line-height:1.4}
+.visual-evidence details small {display:block;padding:0 .9rem .6rem}
+.visual-frame {display:block;width:100%;height:clamp(230px,47vh,430px);border:0;background:#fff}
+.visual-video {height:auto;aspect-ratio:16/9}

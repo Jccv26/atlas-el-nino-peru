@@ -1,0 +1,56 @@
+/* Fixed screen-width boundaries remain readable over relief and forecast fills. */
+#map .peru-outline path { stroke-linejoin: round; stroke-linecap: round; }
+#map .peru-outline .casing { stroke: #112d32; stroke-width: 5.4px; }
+#map .peru-outline .edge { stroke: #f6fae8; stroke-width: 3px; }
+#map .region-path { stroke: #e2ede2; stroke-opacity: .96; stroke-width: 1.6px; }
+#map .region-path {transition-property:stroke}
+#map .region-path.region-from-list {stroke:#f4fffb;stroke-width:3px}
+.map-frame[data-map-layer="todo"] #map .region-path:is(:hover,:focus-visible,.focused,.atlas-hover) {
+  fill:var(--region-fill,transparent) !important;
+}
+#map .region-path.focused,
+#map .region-path.atlas-hover,
+#map .region-path:focus-visible { stroke: #adffe9; stroke-width: 2.8px; }
+#map .local-area { stroke: #bed7d2; stroke-width: 1.2px; }
+#map .local-area.is-selected { fill:#96e9d03d; stroke: #acffe3; stroke-width: 2.8px; }
+#map.atlas-province-view .peru-outline { display:none; }
+#map:not(.map-zoomed) .map-city[data-city="Piura"] text {
+  transform:translate(calc(var(--atlas-pixel) * 20),calc(var(--atlas-pixel) * 4));
+}
+.reportado { --tone:#c6c095; }
+.observacion { --tone:#83bdd3; }
+.symbol.observacion,.symbol.reportado {border-radius:50%}
+.signal-pin.reportado .pin-symbol {fill:none;stroke-width:1.8}
+#nationalImpactRows .signal-row {position:relative;padding:12px 23px 12px 0}
+#nationalImpactRows .impact-status {
+  display:flex;align-items:center;gap:7px;font-size:12px;color:#cfe1db;
+}
+#nationalImpactRows .impact-status::before {
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--tone);flex:none;
+}
+#nationalImpactRows .impact-open {position:absolute;right:5px;top:12px;color:#99cfc4;font-size:18px;line-height:1}
+.explorer .map-return {
+  position: absolute; z-index: 4; right: 15px; bottom: 15px;
+  padding: 9px 13px; min-height: 42px; border: 1px solid #80aaa0;
+  border-radius: 8px; background: #112e32; color: #e4f9f0;
+  font: 600 13px/1.25 Instrument, sans-serif; cursor: pointer;
+}
+.explorer .map-return:hover, .explorer .map-return:focus-visible { background: #285348; }
+.explorer .map-return[hidden] { display: none; }
+@media (min-width: 761px) {
+  .explorer .map-frame,.explorer .map-frame.has-region,.explorer .local-pane {height:clamp(540px,74vh,880px)}
+}
+@media (max-width: 760px) {
+  .explorer #map {height:clamp(315px,57svh,560px)}
+}
+@media (max-width: 640px) {
+  .explorer .map-return { bottom: 9px; right: 9px; padding: 6px 9px; max-width: 45%; }
+  .explorer .map-frame.has-local-area .map-legend,
+  .explorer .map-frame.has-region .map-legend {max-width:47%}
+}
+@media (max-width: 380px) {
+  .explorer .map-head {gap:5px}
+  .explorer .atlas-picker {min-width:0}
+  .explorer .layer-switch {flex-shrink:0}
+  .explorer .layer-switch button {min-width:34px;padding-inline:5px}
+}

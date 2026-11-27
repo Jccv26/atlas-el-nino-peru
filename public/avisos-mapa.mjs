@@ -175,10 +175,18 @@ const localDay=value=>/^\d{4}-\d{2}-\d{2}$/.test(value) ? value :
 
 // Only a complete sequence can establish that a region is absent on a
 // given day. The full national notice still links to all original maps.
-export function noticeForRegionDay(item,region,now=Date.now()) {
+export function noticeForRegionDay(item,region,now=Date.now(),area="",index) {
   if (!item?.coverageDaysComplete || !item.coverageDays?.length) return item;
   const today=localDay(now);
-  const days=item.coverageDays.filter(d=>d.date>=today && (!region || d.regions.includes(region)));
+  const province=area && index?.byId.get(area.slice(0,4));
+  if(area && (!province || index.regionOf(area)!==region))return null;
+  const days=item.coverageDays.filter(d=>{
+    if(d.date<today || region && !d.regions.includes(region))return false;
+    if(!area)return true;
+    if(!d.provincesByRegion?.[region]?.some(name=>fold(name)===fold(province.name)))return false;
+    // A daily provincial listing cannot locate a district within that province.
+    return area.length===4 || Boolean(item.districtLevels?.[area]?.length);
+  });
   if (!days.length) return null;
   const areas=region?[region]:[...new Set(days.flatMap(d=>d.regions))];
   const provinces={};

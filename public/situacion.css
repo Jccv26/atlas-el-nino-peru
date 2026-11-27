@@ -196,3 +196,28 @@
   .press-groups {grid-template-columns:minmax(0,1fr)}
   .regional-meta button {min-height:44px}
 }
+
+.area-brief {margin:2px 0 18px;border-top:1px solid #436268;padding-top:15px}
+.area-brief h3 {font-size:18px;line-height:1.25;letter-spacing:-.02em;margin:0 0 4px}
+.brief-cut,.brief-facts small {color:#b3cac5;font-size:12px;line-height:1.45}
+.brief-cut {margin:0 0 12px}
+.brief-facts {display:grid;gap:12px;list-style:none;margin:0;padding:0}
+.brief-facts li {border-left:2px solid #62988a;padding-left:10px}
+.brief-facts strong {display:block;color:#abe4ce;font-size:12px;font-weight:650}
+.brief-facts p,.brief-gap {margin:3px 0;font-size:14px;line-height:1.42;color:#edf5ef}
+.brief-gap {color:#c1d4cf}
+.area-brief-sources {border-top:1px solid #436268;padding:12px 0;font-size:13px}
+.area-brief-sources summary {color:#b6e8d5;cursor:pointer}
+.area-brief-sources ul {margin:8px 0 0;padding-left:18px}
+.area-brief-sources li {margin:6px 0;line-height:1.4;overflow-wrap:anywhere}
+.area-brief-sources a {color:#b4e3d5;text-underline-offset:2px}
+.brief-more {margin:10px 0}
+.brief-more summary {color:#b6e8d5;cursor:pointer;font-size:13px}
+.brief-more[open] summary {margin-bottom:10px}
+.brief-places {margin-top:4px;font-size:12px}
+.brief-places summary {color:#b6e8d5;cursor:pointer}
+.brief-places p {font-size:12px}
+#areaBriefVisual:not(:empty) {margin-top:12px}
+.brief-context {border-left:2px solid #73938f;padding-left:10px;margin-top:12px}
+.brief-context strong,.brief-context small {display:block;font-size:12px;color:#bad8cf}
+.brief-context p {font-size:14px;line-height:1.45;margin:4px 0}

@@ -490,3 +490,63 @@
     margin-top: 14px;
   }
 }
+
+/* A provincial map keeps a solid land surface, legible names and the official
+   hazard polygons. National imagery and city click targets obscure this scale. */
+#map.atlas-province-view #mapWorld > image:first-child,
+#map.atlas-province-view #mapWorld > rect,
+#map.atlas-province-view #mapLabels {
+  display: none;
+}
+#map.atlas-province-view #countryLines .country-path {
+  fill: #284a47;
+  stroke: #99bdb2;
+}
+#map.atlas-province-view .local-area {
+  fill: #b2ded316;
+  stroke: #b0cbc0;
+  stroke-width: 1.25;
+}
+#map.atlas-province-view .local-area.adjacent {
+  fill: #597e7314;
+  stroke: #8aa99f;
+  stroke-dasharray: 3 2;
+}
+#map.atlas-province-view .local-area.is-selected {
+  fill: #6ac7ab36;
+  stroke: #ebffe0;
+  stroke-width: 2.7;
+}
+#map.atlas-province-view .local-area:focus-visible {
+  outline: none;
+  stroke: white;
+  stroke-width: 3;
+}
+.province-map-status {
+  position: absolute;
+  left: 12px;
+  bottom: 32px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  margin: 0;
+  color: #fff;
+  background: #153031;
+  font-size: 12px;
+  pointer-events: none;
+}
+#map.map-zoomed,
+#map {
+  touch-action: pan-y pinch-zoom;
+}
+#map.atlas-province-view #regions {
+  pointer-events: none;
+}
+/* The provincial dataset supplies the detailed border at this scale. */
+#map.atlas-province-view #regions .region-path {
+  stroke: none;
+  transition: none;
+}
+#map.atlas-province-view.province-awaits-shape #regions .region-path.focused {
+  stroke: #a6d3c4;
+  stroke-width: 1.6px;
+}

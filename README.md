@@ -1,6 +1,8 @@
 # Perú al Día · El Niño hoy
 
-Piloto ciudadano para consultar mediciones, impactos documentados y pronósticos desde Perú hasta provincia y distrito. Las páginas y sus recursos públicos están en `public/`. La fecha de cada observación y la hora de consulta de cada fuente aparecen en la interfaz.
+Piloto ciudadano para consultar mediciones, impactos documentados y pronósticos por región y provincia. Cada ficha comienza con un resumen fechado del lugar. Los avisos identifican los distritos y caseríos que menciona la fuente. Los enlaces distritales anteriores abren la provincia correspondiente. Las páginas y sus recursos públicos están en `public/`.
+
+La capa inicial **Todo** reúne mar, lluvias y ríos. El color de cada región indica qué tipo de evidencia hay en el corte. El contador del círculo indica cuántos reportes agrupa y vuelve a aparecer al acercarse cuando el espacio es pequeño. Las regiones con impactos recientes se pueden explorar también desde la lista. El botón de regreso recorre los niveles provincia, región y país.
 
 ## Uso local
 

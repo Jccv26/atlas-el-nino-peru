@@ -35,3 +35,15 @@ test("una nueva consulta sin revisión del aviso preserva la misma cronología",
  noticeChanges([change],[old],new Date(now));assert.equal(change.changes.length,1);
  const again={...change};noticeChanges([again],[change],new Date(now+10000));assert.deepEqual(again.changes,change.changes);
 });
+
+test('los distritos identificados del departamento de Lima se ubican en su propia provincia',()=>{
+  const signals=localSignals({impacts:{events:[
+    {id:'01',region:'Lima',district:'Villa María del Triunfo',reportedAt:at},
+    {id:'02',region:'Lima',district:'Villa El Salvador',reportedAt:at},
+    {id:'03',region:'Lima',district:'Caleta de Carquín',reportedAt:at},
+    {id:'04',region:'Lima',district:'Miraflores',reportedAt:at}
+  ]}},[],index,now);
+  assert.deepEqual(signals.map(s=>[s.area,s.region]),[['150143','Lima Metropolitana'],['150142','Lima Metropolitana'],['150803','Lima'],['15','Lima']]);
+  assert.equal(inScope(signals[0],'Lima Metropolitana','1501',index),true);
+  assert.equal(inScope(signals[0],'Lima','',index),false);
+});

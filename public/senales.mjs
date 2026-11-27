@@ -1,4 +1,4 @@
-import {noticeCovers} from "./territorios.mjs";
+import {noticeCovers} from "./territorios.mjs?v=3";
 
 const hour = 3600000;
 const number = new Intl.NumberFormat("es-PE", {maximumFractionDigits:2});
@@ -15,7 +15,13 @@ export function localSignals(panel, items, index, now=Date.now()) {
   if (!panel) return [];
   const result = [];
   function add(s) {
-    s.area = s.area || index?.resolve(s.region, s.province, s.district) || "";
+    const code=s.area || s.ubigeo;
+    s.area = typeof code==="string" && /^\d{2}(?:\d{2}){0,2}$/.test(code) ? code
+      : index?.resolve(s.region, s.province, s.district) || "";
+    // Published reports may say "departamento de Lima". A named district
+    // or province resolved in that department identifies its actual map region.
+    if (s.region==="Lima" && index?.regionOf(s.area)==="Lima Metropolitana")
+      s.region="Lima Metropolitana";
     result.push(s);
   }
   const radar = panel.radar || {};
@@ -80,5 +86,5 @@ export function localSignals(panel, items, index, now=Date.now()) {
 export function inScope(s, region, area, index) {
   if (!region) return true;
   if (area) return Boolean(s.region && s.region!==region ? false : s.area?.startsWith(area) || (s.item && noticeCovers(s.item,area,index)));
-  return s.region===region || s.regions?.includes(region);
+  return s.region===region || Boolean(s.regions?.includes(region));
 }
