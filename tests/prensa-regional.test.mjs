@@ -16,6 +16,13 @@ function article(sourceId,title,regions=[],age=0,num=1) {
   const url=new URL('notas/'+num,sources.find(s=>s.id===sourceId).url).href;
   return {id:sourceId+':'+num,url,sourceId,title,kind:'prensa',regions,publishedAt:new Date(now-age).toISOString()};
 }
+test('una afectación local reciente entra en la selección aunque el titular solo identifique el sector',()=>{
+ const context=article('walac','Piura prepara jornada de prevención ante El Niño',['Piura'],0,1);
+ const event=article('walac','Fuerte oleaje destruye una losa en el sector costero',[],3600000,2);
+ const {regional}=selectPressGroups({sources,items:[context,event]},{region:'Piura',now,limit:1});
+ assert.equal(regional[0].title,event.title);
+ assert.deepEqual(regional[0].places,[]);
+});
 test('prioriza redacciones regionales y diversos lugares antes de repetir medio',()=>{
  const items=[
    article('rpp','Piura registra anegamientos',['Piura']),

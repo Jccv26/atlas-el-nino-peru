@@ -5,7 +5,7 @@ import {shareControl,sharePayload} from "./compartir.mjs";
 import {avisoKey,resolveAviso} from "./enlaces-aviso.mjs";
 import { createMap, mapCities } from "./atlas-map.mjs?v=6";
 import {editionAsset} from "./publicacion.mjs";
-import {renderRegionalPress} from "./prensa-regional.mjs";
+import {renderRegionalPress} from "./prensa-regional.mjs?v=2";
 import {portStatusPanel} from "./puertos.mjs";
 import { layerRecords, noticeForRegionDay } from "./avisos-mapa.mjs?v=3";
 const $ = (id) => document.getElementById(id);

@@ -47,6 +47,10 @@ const foreign = /\b(?:ee\s*\.?\s*uu|estados unidos|accion de gracias|miami|flori
 const sports = /\b(?:deportes?|futbol|futbolista|seleccion peruana|liga 1|goles?|goleada|champions league|mundial de clubes|partido amistoso|torneo apertura|torneo clausura|voley|penales|copa libertadores)\b/;
 const climate = /\b(?:fenomeno (?:de )?(?:el |del )?nino|el nino costero|enfen|enso|senamhi|lluvi[a-z]*|precipitaci[a-z]*|llovizn[a-z]*|inund[a-z]*|aneg[a-z]*|drenaj[a-z]*|desbord[a-z]*|oleajes?|huaycos?|huaicos?|quebradas?|sequi[a-z]*|estiaj[a-z]*|graniz[a-z]*|tormentas?|deficit hidrico|caudales?|nivel (?:del|de los) rios?|temperatura del mar|calentamiento (?:del mar|del pacifico)|anomalia (?:termica|marina)|mar de fondo|motobombas?|olas? de calor)\b/;
 const editorialPriority = sourceId => ['rpp','el-comercio'].includes(sourceId) ? 0 : 1;
+function reportsLocalImpact(title) {
+  if (/\b(?:preve\w*|podria\w*|riesgo|posibles?|simulacro|pronostico|prevencion)\b/.test(title)) return false;
+  return /\b(?:inunda\w*|anega\w*|desborda\w*|socav\w*|destruy\w*|drena(?:n|r|ron)?|restablec\w*|reabri\w*|interrump\w*|sin agua|intransitable\w*|evacua\w*|aislad[oa]s?)\b/.test(title);
+}
 
 function eligible(item, sources, region, now) {
   if (item?.kind!=='prensa' || typeof item.title!=='string' || !item.title.trim() || item.withdrawnAt || item.supersededBy) return;
@@ -73,7 +77,8 @@ function eligible(item, sources, region, now) {
   const scope=places.length ? (literal?'La nota menciona ':'Referencia territorial · ')+places.join(', ') :
     publisher ? 'Medio de '+publisher+(nationwide?' · Cobertura nacional':' · Sin ubicación precisa en el titular') :
     'Cobertura de Perú · Sin región precisada';
-  return {item,sourceId:source.id,source:source.name,publisher,places,scope,url,time,title:item.title.trim()};
+  const recentImpact=now-time<=86400000 && reportsLocalImpact(title);
+  return {item,sourceId:source.id,source:source.name,publisher,places,scope,url,time,recentImpact,title:item.title.trim()};
 }
 export function selectPressGroups(panel, {region='',now=Date.now(),limit=3}={}) {
   const sources=new Map((panel?.sources || []).filter(s=>s.kind==='prensa').map(s=>[s.id,s]));
@@ -88,7 +93,7 @@ export function selectPressGroups(panel, {region='',now=Date.now(),limit=3}={}) 
   const latest=(a,b)=>b.time-a.time || a.url.localeCompare(b.url);
   function select(list, regional) {
     list.sort((a,b)=>regional
-      ? Number(Boolean(b.places.length))-Number(Boolean(a.places.length)) || latest(a,b)
+      ? Number(b.recentImpact)-Number(a.recentImpact) || Number(Boolean(b.places.length))-Number(Boolean(a.places.length)) || latest(a,b)
       : editorialPriority(a.sourceId)-editorialPriority(b.sourceId) || latest(a,b));
     const chosen=[],counts=new Map(),areas=new Set();
     for (const pass of [0,1,2]) {
